@@ -101,6 +101,230 @@
   </tr>
 </table>
 
+<!-- ============ 各方案深度解析 ============ -->
+<h2>🔬 各方案深度解析：原理、优缺点</h2>
+
+<!-- --- 方案 A --- -->
+<div class="card" style="border-color:var(--green);">
+<h3 style="color:var(--green);margin-top:0">方案 A：Cloudflare DNS 代理 + Lucky DDNS</h3>
+
+<h4>🧠 实现原理</h4>
+<div class="diagram" style="margin:8px 0">
+<pre style="background:none;border:none;text-align:left;display:inline-block;line-height:1.9;font-size:0.82em;">
+Step 1  Lucky 定时检测 NAS 的 IPv6 地址，通过 Cloudflare API 更新 AAAA 记录
+Step 2  DNS 记录开启 Proxy（橙色云朵），Cloudflare 不返回真实 IPv6，返回自己的 IPv4 地址
+Step 3  办公室浏览器 → DNS 查 nas.example.com → 得到 104.21.xx.xx (Cloudflare IPv4)
+Step 4  浏览器 → TLS → 104.21.xx.xx:8443 → Cloudflare 边缘节点
+Step 5  Cloudflare 边缘 → IPv6 → [你的 NAS IPv6]:8443 → Lucky 反向代理
+Step 6  Lucky → 127.0.0.1:5666 → 飞牛 OS
+</pre>
+</div>
+
+<p><strong>关键点：</strong>Cloudflare 的 Anycast 网络在全球每个节点都是双栈的。它对外用 IPv4 跟你的办公室通信，对内用 IPv6 跟你的 NAS 通信。橙色云朵就是告诉 Cloudflare "帮我做这个翻译"。</p>
+
+<h4>✅ 优点</h4>
+<ul>
+  <li><strong>配置极简：</strong>Lucky 填几个参数即可，不用在 NAS 上装额外软件（Lucky 你本来就有）</li>
+  <li><strong>零成本：</strong>Cloudflare 免费计划完全够用，不需要买 VPS</li>
+  <li><strong>自动 CDN 加速：</strong>静态资源会被缓存在 Cloudflare 全球边缘节点</li>
+  <li><strong>自带 DDoS 防护：</strong>Cloudflare 免费挡常见攻击</li>
+  <li><strong>SSL 证书自动化：</strong>Cloudflare 自动签发和续期边缘证书</li>
+  <li><strong>IPv6 变动无感：</strong>Lucky 自动 DDNS，运营商换 IP 不影响使用</li>
+</ul>
+
+<h4>❌ 缺点</h4>
+<ul>
+  <li><strong>端口严重受限：</strong>Cloudflare 免费版只代理特定 HTTP/HTTPS 端口（80,443,8080,8443 等），非标端口不行</li>
+  <li><strong>Lucky 反向代理多一层：</strong>NAS 端口不是支持列表时，需要 Lucky 做端口映射（如 5666→8443）</li>
+  <li><strong>依赖 Lucky 持续运行：</strong>Lucky 挂了 = DDNS 不更新 = IPv6 换了就连不上</li>
+  <li><strong>Cloudflare 能看到明文：</strong>如果选 Flexible 模式，CF↔NAS 段不加密（选 Full 模式可解决）</li>
+  <li><strong>国内访问可能绕路：</strong>Cloudflare 回源走国际出口，非直连，延迟略高（通常 200-400ms）</li>
+</ul>
+
+<h4>🎯 适用场景</h4>
+<p>只访问 NAS 的 Web 管理界面、Jellyfin、文件管理器等 <strong>HTTP/HTTPS 服务</strong>，且能接受 200-400ms 延迟。这是 <span class="highlight">80% 用户的最佳选择</span>。</p>
+</div>
+
+<!-- --- 方案 B --- -->
+<div class="card" style="border-color:var(--accent);">
+<h3 style="color:var(--accent);margin-top:0">方案 B：Cloudflare Tunnel (cloudflared)</h3>
+
+<h4>🧠 实现原理</h4>
+<div class="diagram" style="margin:8px 0">
+<pre style="background:none;border:none;text-align:left;display:inline-block;line-height:1.9;font-size:0.82em;">
+Step 1  在 NAS 上安装 cloudflared，运行后主动向 Cloudflare 发起一条出站 TCP 长连接
+Step 2  这条连接是 QUIC 协议（基于 UDP），对 NAT 极其友好，不需要任何入站端口
+Step 3  Cloudflare 在控制面创建一条"隧道"，并自动创建 DNS CNAME 记录指向隧道
+Step 4  用户访问 nas.example.com → DNS → Cloudflare 边缘 → 隧道 → cloudflared → NAS 本地服务
+
+  关键对比：
+  ┌──────────────┐         ┌──────────────┐
+  │  方案 A       │         │  方案 B       │
+  │  Cloudflare   │         │  Cloudflare   │
+  │  对外 IPv4    │         │  对外 IPv4    │
+  │  对内 IPv6 ──→ NAS       │  隧道内 ────→ cloudflared → 127.0.0.1
+  │  (需要 IPv6)  │         │  (不需要任何公网 IP!)
+  └──────────────┘         └──────────────┘
+</pre>
+</div>
+
+<p><strong>关键区别：</strong>方案 A 是 Cloudflare "主动找你"（需要 IPv6 可入站），方案 B 是 cloudflared "主动找 Cloudflare"（纯出站连接，防火墙只管出不管入）。</p>
+
+<h4>✅ 优点</h4>
+<ul>
+  <li><strong>无需任何公网 IP：</strong>连 IPv6 都不需要，cloudflared 主动连出去。这对移动宽带/校园网/大内网是救命方案</li>
+  <li><strong>无视运营商防火墙：</strong>出站连接几乎不会被拦截（QUIC over UDP 443）</li>
+  <li><strong>支持任意 TCP 端口：</strong>SSH(22)、FTP(21)、数据库(3306) 都能通过 Tunnel 暴露</li>
+  <li><strong>不用 Lucky DDNS：</strong>Tunnel 自己维持连接，IP 变动自动重连，零感知</li>
+  <li><strong>加密到 NAS：</strong>整条链路 TLS 加密，Cloudflare 边缘到 NAS 全程 QUIC 加密</li>
+  <li><strong>支持私有网络：</strong>可以配合 Cloudflare Access 做零信任认证（Google/GitHub 登录后才能访问）</li>
+</ul>
+
+<h4>❌ 缺点</h4>
+<ul>
+  <li><strong>要在 NAS 上装 cloudflared：</strong>比方案 A 多一步，需要 SSH 进 NAS 操作</li>
+  <li><strong>依赖 cloudflared 进程存活：</strong>进程挂了就断了（可以配 systemd 自动重启）</li>
+  <li><strong>每个服务要单独配置 ingress 规则：</strong>配置文件比方案 A 略复杂</li>
+  <li><strong>国内访问同样绕路：</strong>和方案 A 一样走 Cloudflare 国际网络</li>
+  <li><strong>Tunnel 是 Cloudflare 闭源服务：</strong>锁定在 Cloudflare 生态，不能换 CDN</li>
+</ul>
+
+<h4>🎯 适用场景</h4>
+<p>需要暴露<strong>非 HTTP 端口</strong>（SSH、数据库等），或<strong>连 IPv6 公网都没有</strong>的场景。如果你家宽带是移动大内网连 IPv6 都不给，Tunnel 是唯一解。</p>
+</div>
+
+<!-- --- 方案 C --- -->
+<div class="card" style="border-color:var(--orange);">
+<h3 style="color:var(--orange);margin-top:0">方案 C：frp / 内网穿透（自建 VPS 中转）</h3>
+
+<h4>🧠 实现原理</h4>
+<div class="diagram" style="margin:8px 0">
+<pre style="background:none;border:none;text-align:left;display:inline-block;line-height:1.9;font-size:0.82em;">
+
+  ┌──────────┐      ┌──────────────────┐      ┌──────────┐
+  │  办公室   │ IPv4 │  VPS (双栈公网)   │ IPv4 │   NAS    │
+  │  IPv4    │ ───→ │  frps (服务端)    │ ←─── │  frpc    │
+  │          │      │  有 IPv4 + IPv6   │      │  客户端   │
+  └──────────┘      └──────────────────┘      └──────────┘
+                         ↑
+                    需要租用 VPS
+                    (约 ¥30-100/月)
+
+  流程：
+  1. 租一台有 IPv4 公网 IP 的 VPS（国内推荐阿里云/腾讯云轻量）
+  2. VPS 运行 frps（服务端），监听公网端口
+  3. NAS 运行 frpc（客户端），主动连接 frps，建立隧道
+  4. 办公室访问 VPS_IP:端口 → frps 转发 → frpc 隧道 → NAS
+</pre>
+</div>
+
+<h4>✅ 优点</h4>
+<ul>
+  <li><strong>完全自主可控：</strong>数据走自己的 VPS，不经过第三方 CDN</li>
+  <li><strong>国内延迟极低：</strong>VPS 选国内机房，延迟通常 &lt;10ms</li>
+  <li><strong>端口随心所欲：</strong>想映射什么端口映射什么端口</li>
+  <li><strong>带宽可控：</strong>VPS 带宽是你的，不像 Cloudflare 免费版限速</li>
+</ul>
+
+<h4>❌ 缺点</h4>
+<ul>
+  <li><strong style="color:var(--red);">要花钱：</strong>VPS 月付 ¥30-100，一年 ¥360-1200</li>
+  <li><strong>需要运维 VPS：</strong>系统更新、安全加固、frps 维护</li>
+  <li><strong>单点故障：</strong>VPS 挂了全部服务中断</li>
+  <li><strong>安全责任在你：</strong>VPS 暴露公网，被攻击你自己扛</li>
+  <li><strong>带宽瓶颈：</strong>VPS 带宽通常在 3-10Mbps，大文件传输慢</li>
+  <li><strong>要备案：</strong>国内 VPS 建站需要 ICP 备案（个人使用可以不做，但有风险）</li>
+</ul>
+
+<h4>🎯 适用场景</h4>
+<p>对<strong>延迟极其敏感</strong>（如远程桌面、在线剪辑），或需要<strong>大带宽、非标协议</strong>，且有预算。普通人不需要这个方案。</p>
+</div>
+
+<!-- --- 方案 D --- -->
+<div class="card" style="border-color:var(--purple);">
+<h3 style="color:#bc8cff;margin-top:0">方案 D：Tailscale / ZeroTier（组网方案）</h3>
+
+<h4>🧠 实现原理</h4>
+<pre><code>
+  Tailscale 基于 WireGuard，在所有设备间建立 P2P 加密 mesh 网络。
+  即使 NAS 和办公室在不同 NAT 后面，它也通过 DERP 中继服务器完成打洞。
+  
+  办公室 ──WireGuard 隧道── Tailscale 协调服务器 ──WireGuard 隧道── NAS
+           (打洞成功则 P2P 直连，失败则走 DERP 中继)
+</code></pre>
+
+<h4>✅ 优点</h4>
+<ul><li>配置极简：装客户端 → 登录 → 自动组网</li><li>免费版支持 3 用户 100 设备</li><li>P2P 直连延迟极低</li><li>全端口可达，跟局域网一样</li></ul>
+
+<h4>❌ 缺点</h4>
+<ul><li>办公室电脑也要装客户端（不是纯浏览器访问）</li><li>打洞失败时走中继，速度和 Cloudflare 方案差不多</li><li>不适合分享给他人（每人要装客户端）</li></ul>
+
+<h4>🎯 适用场景</h4>
+<p>你自己多设备之间的互访（手机、笔记本、NAS），而不是对外分享服务。</p>
+</div>
+
+<!-- --- 总结对比 --- -->
+<h2>📊 四种方案一图总结</h2>
+
+<table>
+  <tr><th>方案</th><th>原理</th><th>公网要求</th><th>成本</th><th>端口</th><th>延迟</th><th>难度</th><th>推荐场景</th></tr>
+  <tr style="background:#1a2a1a">
+    <td class="highlight">A. CF 代理</td>
+    <td>橙色云朵 v4↔v6</td>
+    <td>需 IPv6</td>
+    <td class="highlight">免费</td>
+    <td>HTTP only</td>
+    <td>200-400ms</td>
+    <td>⭐⭐</td>
+    <td class="highlight">Web 访问首选</td>
+  </tr>
+  <tr style="background:#1a1a2a">
+    <td style="color:var(--accent)">B. CF Tunnel</td>
+    <td>出站隧道</td>
+    <td class="highlight">不需要！</td>
+    <td class="highlight">免费</td>
+    <td>全部 TCP</td>
+    <td>200-400ms</td>
+    <td>⭐⭐⭐</td>
+    <td style="color:var(--accent)">无公网首选</td>
+  </tr>
+  <tr>
+    <td style="color:var(--orange)">C. frp/VPS</td>
+    <td>自建中转</td>
+    <td>不需要</td>
+    <td class="red">¥30-100/月</td>
+    <td>全部</td>
+    <td class="highlight">&lt;10ms</td>
+    <td>⭐⭐⭐⭐</td>
+    <td>低延迟需求</td>
+  </tr>
+  <tr>
+    <td style="color:#bc8cff">D. Tailscale</td>
+    <td>WireGuard 组网</td>
+    <td>不需要</td>
+    <td class="highlight">免费</td>
+    <td>全部</td>
+    <td>10-100ms</td>
+    <td>⭐</td>
+    <td>个人多设备互访</td>
+  </tr>
+</table>
+
+<h2>🛤️ 推荐决策路径</h2>
+
+<div class="diagram" style="font-size:0.9em;">
+<pre style="background:none;border:none;text-align:left;display:inline-block;line-height:2;">
+                    ┌── 是 ──→ <span style="color:var(--green)"><strong>方案 A: CF 代理 ✅</strong></span>
+  NAS 有 IPv6 公网？──┤
+                    └── 否 ──→ 需要非 HTTP 端口？──┬── 是 ──→ 有预算？──┬── 是 → <span style="color:var(--orange)">方案 C: VPS frp</span>
+                                                  │                    └── 否 → <span style="color:var(--accent)"><strong>方案 B: CF Tunnel</strong></span>
+                                                  │
+                                                  └── 否 ──→ <span style="color:var(--accent)"><strong>方案 B: CF Tunnel ✅</strong></span>
+
+  你的场景：NAS 有 IPv6 → 只需要 Web 访问 → <span style="color:var(--green);font-size:1.1em;"><strong>方案 A，别纠结了。</strong></span>
+</pre>
+</div>
+
 <!-- ============ 前提条件 ============ -->
 <h2>📦 前提条件</h2>
 <div class="card">
