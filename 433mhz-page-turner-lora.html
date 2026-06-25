@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SX1278 LoRa 无线翻页遥控器 — 全套软硬件方案</title>
+<style>
+  :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#c9d1d9; --accent:#58a6ff; --green:#3fb950; --orange:#d2991d; --red:#f85149; --purple:#bc8cff; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background:var(--bg); color:var(--text); line-height:1.7; padding:20px; }
+  .container { max-width:1100px; margin:0 auto; }
+  h1 { font-size:2em; color:var(--accent); border-bottom:2px solid var(--border); padding-bottom:12px; margin:30px 0 20px; }
+  h2 { font-size:1.5em; color:var(--green); margin:30px 0 15px; padding:10px 14px; background:var(--card); border-left:4px solid var(--green); border-radius:0 6px 6px 0; }
+  h3 { font-size:1.2em; color:var(--orange); margin:20px 0 10px; }
+  p { margin:10px 0; }
+  ul, ol { margin:10px 0 10px 24px; }
+  li { margin:6px 0; }
+  code { background:#1c2333; padding:2px 6px; border-radius:4px; font-family:"SF Mono","Fira Code",monospace; font-size:0.9em; color:var(--accent); }
+  pre { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; overflow-x:auto; margin:14px 0; font-size:0.85em; }
+  pre code { background:none; padding:0; color:var(--text); }
+  table { width:100%; border-collapse:collapse; margin:16px 0; }
+  th, td { border:1px solid var(--border); padding:10px 14px; text-align:left; }
+  th { background:var(--card); color:var(--accent); font-weight:600; }
+  tr:nth-child(even) { background:#0f1319; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; margin:16px 0; }
+  .highlight { color:var(--green); font-weight:bold; }
+  .warn { color:var(--orange); font-weight:bold; }
+  .win { color:var(--green); }
+  .step { background:var(--card); border-left:4px solid var(--accent); padding:12px 18px; margin:12px 0; border-radius:0 8px 8px 0; }
+  .step-num { display:inline-block; background:var(--accent); color:#000; width:28px; height:28px; line-height:28px; text-align:center; border-radius:50%; font-weight:bold; margin-right:10px; }
+  .arch-box { display:flex; gap:20px; flex-wrap:wrap; margin:16px 0; align-items:stretch; }
+  .arch-item { flex:1; min-width:260px; background:var(--card); border:2px solid var(--border); border-radius:10px; padding:18px; text-align:center; }
+  .arch-item h3 { margin-top:0; }
+  .arrow { font-size:2em; color:var(--accent); align-self:center; }
+  .link-btn { display:inline-block; background:var(--accent); color:#000; padding:6px 14px; border-radius:6px; text-decoration:none; font-weight:600; font-size:0.9em; }
+  .link-btn:hover { opacity:0.8; }
+  hr { border:none; border-top:1px solid var(--border); margin:30px 0; }
+  .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:0.8em; margin-right:6px; }
+  .tag-lora { background:#1a3a2a; color:var(--green); }
+  .tag-hw { background:#2a1a3a; color:var(--purple); }
+  .tag-sw { background:#1a2a3a; color:var(--accent); }
+  @media print { body { background:#fff; color:#000; } .card, pre, th { background:#f5f5f5; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📡 SX1278 LoRa 无线翻页遥控器 — 全套软硬件方案</h1>
+
+<div class="card">
+  <h3>📋 需求概述</h3>
+  <ul>
+    <li>遥控器(发射端)通过 <code>433MHz LoRa</code> 无线发送「上一页/下一页」指令</li>
+    <li>接收器连接电脑 USB，模拟 <code>Page Up</code> / <code>Page Down</code> 键盘按键</li>
+    <li>遥控距离：<span class="highlight">100-300 米</span>（含穿墙/建筑遮挡场景）</li>
+    <li>完整 BOM 物料清单 + 软件源码 + 步骤文档</li>
+  </ul>
+  <p style="margin-top:12px; color:var(--green);">
+    ⭐ 本方案选用 <strong>SX1278 LoRa</strong> + <strong>Pro Micro 3.3V</strong>，LoRa 扩频灵敏度比 FSK 高 22dB，穿墙无忧。
+  </p>
+</div>
+
+<!-- ============ 架构总览 ============ -->
+<h2>🏗️ 系统架构</h2>
+
+<div class="arch-box">
+  <div class="arch-item">
+    <h3>🔴 发射端 (遥控器)</h3>
+    <p>Pro Micro 3.3V/8MHz<br>+ SX1278 LoRa<br>+ 2 个按键<br>+ 18650 锂电池直供</p>
+  </div>
+  <div class="arrow">→</div>
+  <div class="arch-item" style="border-color:var(--green);">
+    <h3>📶 LoRa 433MHz</h3>
+    <p>SX1278 模块<br>SF12 + BW125kHz<br>灵敏度 -139dBm<br>穿墙能力极强</p>
+  </div>
+  <div class="arrow">→</div>
+  <div class="arch-item" style="border-color:var(--orange);">
+    <h3>🟢 接收端 (接收器)</h3>
+    <p>Pro Micro 3.3V/8MHz<br>+ SX1278 LoRa<br>→ USB HID 键盘<br>→ Page Up / Down</p>
+  </div>
+  <div class="arrow">→</div>
+  <div class="arch-item" style="border-color:var(--accent);">
+    <h3>💻 电脑</h3>
+    <p>识别为 USB 键盘<br>接收 Page Up/Down<br>键码控制翻页</p>
+  </div>
+</div>
+
+<!-- ============ 为什么选 Pro Micro 3.3V ============ -->
+<h2>⚡ 为什么选 Pro Micro 3.3V / 8MHz？</h2>
+
+<div class="card">
+  <table>
+    <tr><th>优点</th><th>说明</th></tr>
+    <tr><td>电压完美匹配</td><td>SX1278 是 3.3V 器件。3.3V Pro Micro 的 IO 也是 3.3V，<span class="highlight">无需任何电平转换</span>。</td></tr>
+    <tr><td>18650 直供</td><td>18650 满电 4.2V → 3.7V 标称，可直接接 Pro Micro 3.3V 的 RAW 引脚（内置 LDO 稳压）。<span class="highlight">一块电池直驱，无需升压。</span></td></tr>
+    <tr><td>功耗更低</td><td>8MHz (vs 16MHz) + 3.3V (vs 5V) → 空载电流约 <span class="highlight">5mA vs 20mA</span>，续航翻倍。</td></tr>
+    <tr><td>USB HID 正常</td><td>ATmega32U4 在 3.3V/8MHz 下原生支持 USB，<code>Keyboard.h</code> 库完全可用。</td></tr>
+  </table>
+</div>
+
+<!-- ============ BOM ============ -->
+<h2>📦 物料清单 (BOM)</h2>
+
+<table>
+  <tr><th>序号</th><th>物料名称</th><th>规格/型号</th><th>数量</th><th>单价(参考)</th><th>用途</th><th>购买渠道</th></tr>
+  <tr><td>1</td><td>SX1278 LoRa 模块</td><td>433MHz, SPI, 3.3V, 带弹簧天线</td><td>2</td><td>¥12-20</td><td>TX + RX 无线通信</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=SX1278+LoRa+433M">淘宝</a></td></tr>
+  <tr><td>2</td><td>Pro Micro 3.3V</td><td>ATmega32U4, 3.3V/8MHz</td><td>2</td><td>¥18-25</td><td>发射端+接收端 MCU</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=Pro+Micro+3.3V+ATmega32U4">淘宝</a></td></tr>
+  <tr><td>3</td><td>18650 锂电池</td><td>3.7V, ≥2000mAh</td><td>1</td><td>¥8-15</td><td>遥控器供电</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=18650+锂电池">淘宝</a></td></tr>
+  <tr><td>4</td><td>18650 电池盒</td><td>单节带开关</td><td>1</td><td>¥3-5</td><td>电池安装</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=18650电池盒+单节">淘宝</a></td></tr>
+  <tr><td>5</td><td>TP4056 充电模块</td><td>USB-C 或 MicroUSB, 3.3V 兼容</td><td>1</td><td>¥2-5</td><td>锂电池充电</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=TP4056+充电模块">淘宝</a></td></tr>
+  <tr><td>6</td><td>轻触按键</td><td>6x6mm 或 12x12mm</td><td>2</td><td>¥0.5-1</td><td>上一页/下一页按键</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=轻触按键+12x12">淘宝</a></td></tr>
+  <tr><td>7</td><td>LED 指示灯 (可选)</td><td>3mm 红+绿 (3.3V 用 220Ω)</td><td>2</td><td>¥0.5</td><td>状态指示</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=LED+3mm">淘宝</a></td></tr>
+  <tr><td>8</td><td>10KΩ 电阻</td><td>1/4W</td><td>2</td><td>¥0.2</td><td>按键上拉</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=10K+电阻">淘宝</a></td></tr>
+  <tr><td>9</td><td>220Ω 电阻</td><td>1/4W</td><td>2</td><td>¥0.2</td><td>LED 限流</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=220欧+电阻">淘宝</a></td></tr>
+  <tr><td>10</td><td>排针 + 杜邦线</td><td>公母各一套</td><td>若干</td><td>¥5</td><td>接线</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=杜邦线+排针">淘宝</a></td></tr>
+  <tr><td>11</td><td>外壳 (可选)</td><td>3D 打印 / 塑料盒</td><td>2</td><td>¥5-20</td><td>封装</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=塑料+防水盒+DIY">淘宝</a></td></tr>
+  <tr><td>12</td><td>MicroUSB 数据线</td><td>标准 USB-Micro</td><td>1</td><td>¥3-5</td><td>接收端连电脑 / 烧录</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=MicroUSB数据线">淘宝</a></td></tr>
+  <tr class="highlight"><td colspan="3"><strong>总计</strong></td><td></td><td><strong>¥85-150</strong></td><td colspan="2">发射端+接收端全套</td></tr>
+</table>
+
+<!-- ============ 接线图 ============ -->
+<h2>🔌 接线图</h2>
+
+<div class="card">
+  <h3>SX1278 引脚功能</h3>
+  <p>SX1278 使用 <span class="highlight">SPI 接口</span>，共需连接 6 根信号线 + 2 根电源线：</p>
+  <table style="max-width:500px">
+    <tr><th>SX1278 引脚</th><th>功能</th><th>接 Pro Micro</th></tr>
+    <tr><td>VCC</td><td>电源 3.3V</td><td>3.3V (VCC)</td></tr>
+    <tr><td>GND</td><td>地</td><td>GND</td></tr>
+    <tr><td>NSS (CS)</td><td>SPI 片选</td><td>D10</td></tr>
+    <tr><td>SCK</td><td>SPI 时钟</td><td>D15 (SCK)</td></tr>
+    <tr><td>MOSI</td><td>SPI 主机出从机入</td><td>D16 (MOSI)</td></tr>
+    <tr><td>MISO</td><td>SPI 主机入从机出</td><td>D14 (MISO)</td></tr>
+    <tr><td>DIO0</td><td>中断引脚 (接收完成)</td><td>D2</td></tr>
+    <tr><td>RST</td><td>复位 (可选)</td><td>D9</td></tr>
+  </table>
+</div>
+
+<div class="arch-box">
+  <div class="arch-item">
+    <h3>🔴 发射端接线</h3>
+    <pre><code>SX1278 → Pro Micro (TX)
+VCC   → 3.3V
+GND   → GND
+NSS   → D10
+SCK   → D15
+MOSI  → D16
+MISO  → D14
+DIO0  → D2
+RST   → D9
+
+按键:
+BTN_UP   → D4 + GND (INPUT_PULLUP)
+BTN_DOWN → D5 + GND
+
+供电: 18650 → RAW → 板载LDO → 3.3V</code></pre>
+  </div>
+  <div class="arch-item" style="border-color:var(--green)">
+    <h3>🟢 接收端接线</h3>
+    <pre><code>SX1278 → Pro Micro (RX) 
+VCC   → 3.3V
+GND   → GND
+NSS   → D10
+SCK   → D15
+MOSI  → D16
+MISO  → D14
+DIO0  → D2
+RST   → D9
+
+LED: D4 + 220Ω → GND
+
+供电: USB → RAW → 板载LDO → 3.3V</code></pre>
+  </div>
+</div>
+
+<div class="card">
+  <h3>⚠️ 烧录注意事项</h3>
+  <p>SX1278 的 SPI 引脚 (D14/D15/D16) 也是 Pro Micro 的 ISP 烧录引脚。<span class="warn">烧录固件前先把 SX1278 的 SCK/MOSI/MISO 拔掉</span>，烧完再接上，否则会冲突。</p>
+</div>
+
+<!-- ============ 软件方案 ============ -->
+<h2>💻 软件方案</h2>
+
+<h3>3.1 开发环境准备</h3>
+
+<div class="step"><span class="step-num">1</span><strong>安装 Arduino IDE</strong>：<a target="_blank" href="https://www.arduino.cc/en/software">Arduino IDE 2.x</a></div>
+<div class="step"><span class="step-num">2</span><strong>添加开发板</strong>：文件 → 首选项 → 附加开发板管理器网址，添加 <code>https://raw.githubusercontent.com/sparkfun/Arduino_Boards/main/IDE_Board_Manager/package_sparkfun_index.json</code></div>
+<div class="step"><span class="step-num">3</span><strong>安装开发板支持</strong>：工具 → 开发板 → 开发板管理器 → 搜索 <code>SparkFun AVR Boards</code> → 安装</div>
+<div class="step"><span class="step-num">4</span><strong>选择开发板</strong>：工具 → 开发板 → SparkFun Pro Micro → 处理器选 <code>ATmega32U4 (3.3V, 8MHz)</code></div>
+<div class="step"><span class="step-num">5</span><strong>安装 RadioLib 库</strong>：项目 → 加载库 → 管理库 → 搜索 <code>RadioLib</code> by Jan Gromes → 安装</div>
+
+<h3>3.2 发射端 (TX) — 固件代码</h3>
+
+<pre><code><span class="comment">// ==========================================
+// 发射端 (TX) — Pro Micro 3.3V + SX1278 LoRa
+// 按键 → LoRa 发送 "UP" / "DOWN"
+// ==========================================</span>
+
+<span class="keyword">#include</span> <span class="string">&lt;RadioLib.h&gt;</span>
+
+<span class="comment">// SX1278 SPI 引脚 (Pro Micro)</span>
+<span class="keyword">#define</span> LORA_NSS   10
+<span class="keyword">#define</span> LORA_DIO0  2
+<span class="keyword">#define</span> LORA_RST   9
+
+<span class="comment">// 按键引脚</span>
+<span class="keyword">#define</span> BTN_UP     4
+<span class="keyword">#define</span> BTN_DOWN   5
+
+SX1278 radio = <span class="keyword">new</span> Module(LORA_NSS, LORA_DIO0, LORA_RST);
+
+<span class="keyword">void</span> <span class="highlight">setup</span>() {
+  <span class="keyword">pinMode</span>(BTN_UP,   INPUT_PULLUP);
+  <span class="keyword">pinMode</span>(BTN_DOWN, INPUT_PULLUP);
+
+  <span class="comment">// 初始化 LoRa: 433.0 MHz, SF12, BW=125kHz, CR=4/5</span>
+  <span class="keyword">int</span> state = radio.<span class="keyword">begin</span>(433.0, 125.0, 12, 5, 0x12);
+  <span class="keyword">if</span> (state != RADIOLIB_ERR_NONE) {
+    <span class="comment">// 初始化失败，死循环 (调试时改为 Serial.print 查看错误)</span>
+    <span class="keyword">while</span> (true);
+  }
+
+  radio.<span class="keyword">setOutputPower</span>(17);  <span class="comment">// 发射功率 17dBm (最大)</span>
+}
+
+<span class="keyword">void</span> <span class="highlight">loop</span>() {
+  <span class="keyword">static</span> unsigned long lastSend = 0;
+  <span class="keyword">unsigned long</span> now = millis();
+
+  <span class="keyword">if</span> (now - lastSend > 200) {
+    <span class="keyword">if</span> (<span class="keyword">digitalRead</span>(BTN_UP) == LOW) {
+      <span class="keyword">int</span> state = radio.<span class="keyword">transmit</span>(<span class="string">"UP"</span>);
+      lastSend = now;
+    }
+    <span class="keyword">if</span> (<span class="keyword">digitalRead</span>(BTN_DOWN) == LOW) {
+      <span class="keyword">int</span> state = radio.<span class="keyword">transmit</span>(<span class="string">"DOWN"</span>);
+      lastSend = now;
+    }
+  }
+
+  <span class="keyword">delay</span>(20);
+}
+</code></pre>
+
+<h3>3.3 接收端 (RX) — 固件代码</h3>
+
+<pre><code><span class="comment">// ==========================================
+// 接收端 (RX) — Pro Micro 3.3V + SX1278 LoRa
+// LoRa 接收 → USB HID 模拟 Page Up / Page Down
+// ==========================================</span>
+
+<span class="keyword">#include</span> <span class="string">&lt;Keyboard.h&gt;</span>
+<span class="keyword">#include</span> <span class="string">&lt;RadioLib.h&gt;</span>
+
+<span class="comment">// SX1278 SPI 引脚</span>
+<span class="keyword">#define</span> LORA_NSS   10
+<span class="keyword">#define</span> LORA_DIO0  2
+<span class="keyword">#define</span> LORA_RST   9
+<span class="keyword">#define</span> LED_PIN    4
+
+SX1278 radio = <span class="keyword">new</span> Module(LORA_NSS, LORA_DIO0, LORA_RST);
+
+<span class="keyword">void</span> <span class="highlight">setup</span>() {
+  <span class="keyword">pinMode</span>(LED_PIN, OUTPUT);
+
+  <span class="comment">// 初始化 LoRa: 参数必须与发射端完全一致</span>
+  <span class="keyword">int</span> state = radio.<span class="keyword">begin</span>(433.0, 125.0, 12, 5, 0x12);
+  <span class="keyword">if</span> (state != RADIOLIB_ERR_NONE) {
+    <span class="keyword">while</span> (true);
+  }
+
+  <span class="comment">// 启动持续接收模式</span>
+  radio.<span class="keyword">startReceive</span>();
+
+  Keyboard.<span class="keyword">begin</span>();
+
+  <span class="comment">// 启动信号: LED 闪烁 3 次</span>
+  <span class="keyword">for</span> (<span class="keyword">int</span> i = 0; i < 3; i++) {
+    <span class="keyword">digitalWrite</span>(LED_PIN, HIGH);
+    <span class="keyword">delay</span>(150);
+    <span class="keyword">digitalWrite</span>(LED_PIN, LOW);
+    <span class="keyword">delay</span>(150);
+  }
+}
+
+<span class="keyword">void</span> <span class="highlight">loop</span>() {
+  String msg;
+  <span class="keyword">int</span> state = radio.<span class="keyword">receive</span>(msg);
+
+  <span class="keyword">if</span> (state == RADIOLIB_ERR_NONE) {
+    <span class="keyword">digitalWrite</span>(LED_PIN, HIGH);
+
+    <span class="keyword">if</span> (msg == <span class="string">"UP"</span>) {
+      Keyboard.<span class="keyword">press</span>(KEY_PAGE_UP);
+      <span class="keyword">delay</span>(50);
+      Keyboard.<span class="keyword">releaseAll</span>();
+    }
+    <span class="keyword">else</span> <span class="keyword">if</span> (msg == <span class="string">"DOWN"</span>) {
+      Keyboard.<span class="keyword">press</span>(KEY_PAGE_DOWN);
+      <span class="keyword">delay</span>(50);
+      Keyboard.<span class="keyword">releaseAll</span>();
+    }
+
+    <span class="keyword">digitalWrite</span>(LED_PIN, LOW);
+  }
+
+  <span class="comment">// 重新进入接收模式</span>
+  radio.<span class="keyword">startReceive</span>();
+}
+</code></pre>
+
+<!-- ============ 完整开发步骤 ============ -->
+<h2>📝 完整开发步骤</h2>
+
+<h3>Part A：发射端 (遥控器)</h3>
+
+<div class="step"><span class="step-num">1</span><strong>搭建 Arduino 开发环境</strong><br>安装 Arduino IDE → 添加 SparkFun 板支持 → 选择 Pro Micro 3.3V/8MHz → 安装 RadioLib 库。</div>
+
+<div class="step"><span class="step-num">2</span><strong>SX1278 硬件接线</strong><br>按上方接线图连接 SX1278 (VCC→3.3V, GND→GND, NSS→D10, SCK→D15, MOSI→D16, MISO→D14, DIO0→D2, RST→D9)。焊接弹簧天线到 SX1278 的 ANT 焊盘。</div>
+
+<div class="step"><span class="step-num">3</span><strong>按键接线</strong><br>两个按键各一端接 GND，另一端分别接 D4 (Page Up) 和 D5 (Page Down)。利用芯片内部上拉 (<code>INPUT_PULLUP</code>)，无需外部电阻。</div>
+
+<div class="step"><span class="step-num">4</span><strong>供电方案</strong><br>18650 电池 (3.7-4.2V) → Pro Micro RAW 引脚。Pro Micro 3.3V 版内置 MIC5219 LDO，输入 2.5-12V 稳压到 3.3V。<span class="highlight">一块电池直驱，非常简洁。</span></div>
+
+<div class="step"><span class="step-num">5</span><strong>烧录固件</strong><br><span class="warn">⚠️ 先拔掉 SX1278 的 SCK/MOSI/MISO (SPI 与 ISP 冲突)</span> → 编译上传发射端代码 → 接回 SPI 线。</div>
+
+<div class="step"><span class="step-num">6</span><strong>测试发射端</strong><br>接上 USB 用串口监视器(9600bps)查看，或与接收端联调。按下按键，SX1278 的 DIO0 会短暂拉高表示发送完成。</div>
+
+<h3>Part B：接收端 (接收器)</h3>
+
+<div class="step"><span class="step-num">1</span><strong>硬件接线</strong><br>与发射端完全相同的 SPI 接线方式，另外 D4 接 LED+220Ω→GND。</div>
+
+<div class="step"><span class="step-num">2</span><strong>烧录固件</strong><br>拔掉 SPI 线 → 上传接收端代码 → 接回。选择开发板 "SparkFun Pro Micro (3.3V, 8MHz)"。</div>
+
+<div class="step"><span class="step-num">3</span><strong>插入电脑验证 USB HID</strong><br>LED 闪烁 3 次表示就绪 → 电脑应识别出 USB 键盘 → 按下遥控器 → Page Up/Down 生效。</div>
+
+<div class="step"><span class="step-num">4</span><strong>拉距测试</strong><br>先在 5m 内调通 → 逐步拉远 → 测试 100m、200m、300m。LoRa 的优势在此时显现。</div>
+
+<!-- ============ LoRa 参数说明 ============ -->
+<h2>⚙️ LoRa 参数配置详解</h2>
+
+<div class="card">
+  <table>
+    <tr><th>参数</th><th>代码表示</th><th>本方案取值</th><th>说 明</th></tr>
+    <tr><td>频率</td><td><code>433.0</code> (MHz)</td><td><span class="highlight">433.0</span></td><td>中国 ISM 免许可频段。两边必须一致。</td></tr>
+    <tr><td>带宽 BW</td><td><code>125.0</code> (kHz)</td><td><span class="highlight">125kHz</span></td><td>越小距离越远。125k 是最佳平衡点。</td></tr>
+    <tr><td>扩频因子 SF</td><td><code>12</code></td><td><span class="highlight">SF12</span></td><td>6~12，越大越远但越慢。SF12=最远距离。</td></tr>
+    <tr><td>编码率 CR</td><td><code>5</code> (即 4/5)</td><td><span class="highlight">4/5</span></td><td>纠错编码率。5=4/5, 8=4/8。越小抗干扰越强。</td></tr>
+    <tr><td>同步字 Sync</td><td><code>0x12</code></td><td><span class="highlight">0x12</span></td><td>私有网络标识。两边一致才能通信。</td></tr>
+    <tr><td>发射功率</td><td><code>setOutputPower(17)</code></td><td><span class="highlight">17dBm</span></td><td>SX1278 最大 20dBm，17dBm 为常用最大。</td></tr>
+  </table>
+  <p style="margin-top:12px;"><strong>参数优先级：</strong>SF 和 BW 对距离影响最大。SF12+BW125k 组合可达 <span class="highlight">5000m 以上</span>空旷距离。</p>
+  <p style="color:var(--orange);margin-top:8px;">⚠️ 发射端和接收端的频率、BW、SF、CR、Sync 必须完全一致！</p>
+</div>
+
+<!-- ============ LoRa 参数对距离的影响 ============ -->
+<h2>📏 LoRa 参数对距离的影响</h2>
+
+<table>
+  <tr><th>SF</th><th>BW</th><th>灵敏度</th><th>空中时间 (10字节)</th><th>空旷理论距离</th></tr>
+  <tr><td>SF7</td><td>125kHz</td><td>-124 dBm</td><td>~40ms</td><td>~800m</td></tr>
+  <tr><td>SF9</td><td>125kHz</td><td>-131 dBm</td><td>~120ms</td><td>~2000m</td></tr>
+  <tr class="highlight"><td><strong>SF12</strong></td><td>125kHz</td><td><strong>-139 dBm</strong></td><td><strong>~330ms</strong></td><td><strong>~5000m</strong></td></tr>
+  <tr><td>SF12</td><td>62.5kHz</td><td>-142 dBm</td><td>~660ms</td><td>~6000m+</td></tr>
+</table>
+<p>SF12 + 125kHz 是最佳平衡：距离远 (5000m)，延迟适中 (330ms 按键响应完全可接受)。</p>
+
+<!-- ============ 技术要点 ============ -->
+<h2>🔧 关键技术要点</h2>
+
+<h3>1. 为什么 Pro Micro 3.3V 的 USB 仍然可用？</h3>
+<p>ATmega32U4 的 USB 控制器有自己的 3.3V 稳压器和独立的 48MHz 时钟（从内部 PLL 产生），<span class="highlight">不依赖主 CPU 时钟和 IO 电压</span>。因此即使在 3.3V/8MHz 下运行，USB 仍然正常工作。无数 Pro Micro 3.3V 项目已验证。</p>
+
+<h3>2. RadioLib 库的接收模式</h3>
+<p>RadioLib 的 <code>receive()</code> 方法是<span class="warn">阻塞式</span>的。配合 DIO0 中断，SX1278 在收到数据后拉高 DIO0，RadioLib 自动退出阻塞。对于翻页遥控器的低频率按键场景，这个开销可以忽略。</p>
+
+<h3>3. 抗干扰与多设备并存</h3>
+<ul>
+  <li><strong>同步字 Sync Word</strong>：<code>0x12</code> (可改 0x00-0xFF) 作为网络 ID，不同 Sync Word 的 LoRa 设备互不干扰。</li>
+  <li><strong>LoRa 天然优势</strong>：扩频通信同一频点可同时存在多路信号而不冲突。</li>
+  <li><strong>如果信号冲突</strong>：换 Sync Word 或换频道 (如 434.0MHz)。</li>
+</ul>
+
+<h3>4. 低功耗优化</h3>
+<ul>
+  <li>Pro Micro 3.3V/8MHz 空载 ~5mA</li>
+  <li>利用 Arduino 的 <code>&lt;avr/sleep.h&gt;</code> 进入 IDLE 睡眠，按键中断唤醒</li>
+  <li>SX1278 的 <code>sleep()</code> 功耗仅 0.2μA</li>
+  <li>2000mAh 电池理论可用数周至数月</li>
+</ul>
+
+<h3>5. 天线注意事项</h3>
+<ul>
+  <li>SX1278 模块通常附带弹簧天线，焊接到 ANT 焊盘</li>
+  <li>天线应<span class="warn">远离金属物体</span>，不被外壳屏蔽</li>
+  <li>如需更好距离，可换 433MHz 棒状天线 (SMA 接口需另买转接板)</li>
+  <li><span class="highlight">天线方向影响很大</span>：TX 和 RX 天线尽量平行放置</li>
+</ul>
+
+<!-- ============ 接收端替代方案 ============ -->
+<h2>🔄 接收端变体：直接用 RP2040 / ESP32</h2>
+<div class="card">
+  <p>如果想进一步降低成本或使用更现代的 MCU，接收端可以替换为：</p>
+  <table>
+    <tr><th>MCU</th><th>USB HID?</th><th>优点</th><th>注意</th></tr>
+    <tr><td>Raspberry Pi Pico</td><td>✅ RP2040 支持 TinyUSB</td><td>¥15, 性能强</td><td>需用 Arduino-Pico 核心, <code>Keyboard.h</code> 略有差异</td></tr>
+    <tr><td>ESP32-S2/S3</td><td>✅ 内置 USB-OTG</td><td>¥20, WiFi+BLE 可扩展</td><td>3.3V 原生, ESP32 BSP 的 Keyboard 库可用</td></tr>
+  </table>
+  <p>但 <span class="highlight">Pro Micro 3.3V 仍然是本方案首选</span>——资料最多、社区最大、"插上就是键盘"零配置。</p>
+</div>
+
+<!-- ============ 测试验收 ============ -->
+<h2>✅ 测试验收清单</h2>
+<ol>
+  <li>发射端连接 USB → 串口监视器 → 按键按下能看到 RadioLib 日志</li>
+  <li>接收端上电 LED 闪烁 3 次 → 进入接收模式</li>
+  <li>接收端插入 Windows → 设备管理器出现 "USB Composite Device / HID Keyboard"</li>
+  <li>5m 近距离先调通 (最易发现接线/参数问题)</li>
+  <li>打开记事本 → 按遥控器 → 页面上下翻动</li>
+  <li>PowerPoint / PDF / Chrome 中测试翻页功能正常</li>
+  <li><span class="highlight">100m → 200m → 300m 逐步拉距 (含穿墙)</span></li>
+  <li>持续按压测试 (防抖/去重逻辑是否生效)</li>
+  <li>电池续航测试 (至少可用一整天)</li>
+</ol>
+
+<!-- ============ 故障排查 ============ -->
+<h2>🛠️ 故障排查</h2>
+<table>
+  <tr><th>问题</th><th>可能原因</th><th>解决方法</th></tr>
+  <tr><td>接收不到信号</td><td>频率/参数不匹配</td><td>核对两边 <code>radio.begin()</code> 参数完全一致</td></tr>
+  <tr><td>偶尔收到偶尔收不到</td><td>天线未焊接 / 接触不良</td><td>焊牢弹簧天线，确保 ANT 焊盘无虚焊</td></tr>
+  <tr><td>距离近但有丢包</td><td>SPI 接线太长或松动</td><td>缩短杜邦线，或直接焊接</td></tr>
+  <tr><td>Pro Micro 无法上传</td><td>SX1278 占用 ISP 引脚</td><td>拔掉 SCK/MOSI/MISO → 上传 → 接回</td></tr>
+  <tr><td>电脑识别不到键盘</td><td>固件未成功运行或 3.3V 板选择错误</td><td>检查开发板是否选 "3.3V/8MHz", 重插 USB</td></tr>
+  <tr><td>按键连发/不灵敏</td><td>防抖间隔不当</td><td>调整 <code>lastSend</code> 间隔 (推荐 200ms)</td></tr>
+  <tr><td>电池很快没电</td><td>未进入睡眠 / 模块未休眠</td><td>发射端代码加入低功耗模式</td></tr>
+  <tr><td>RadioLib 编译报错</td><td>库版本不兼容</td><td>确保安装最新版 RadioLib (≥ 6.x)</td></tr>
+</table>
+
+<hr>
+
+<div class="card" style="text-align:center">
+  <p>📐 方案版本: v2.0 (LoRa) | 📅 2026-06-21</p>
+  <p style="color:var(--green);font-size:1.05em;">SX1278 LoRa + Pro Micro 3.3V — 远距离、穿墙强、电量省、无线翻页终极方案</p>
+  <p style="color:var(--accent);margin-top:6px;">基于 <a href="scheme-comparison.html" style="color:var(--accent);">方案对比文档</a> 所选的最优方案</p>
+</div>
+
+</div>
+</body>
+</html>

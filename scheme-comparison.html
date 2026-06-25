@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>方案对比：HC-12 vs SX1278 LoRa</title>
+<style>
+  :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#c9d1d9; --accent:#58a6ff; --green:#3fb950; --orange:#d2991d; --red:#f85149; --purple:#bc8cff; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background:var(--bg); color:var(--text); line-height:1.7; padding:20px; }
+  .container { max-width:1100px; margin:0 auto; }
+  h1 { font-size:1.8em; color:var(--accent); border-bottom:2px solid var(--border); padding-bottom:10px; margin:20px 0 16px; }
+  h2 { font-size:1.3em; color:var(--green); margin:20px 0 12px; }
+  h3 { color:var(--orange); margin:14px 0 8px; }
+  p { margin:8px 0; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; }
+  th, td { border:1px solid var(--border); padding:10px 14px; text-align:left; font-size:0.95em; }
+  th { background:var(--card); color:var(--accent); }
+  tr:nth-child(even) { background:#0f1319; }
+  .win { color:var(--green); font-weight:bold; }
+  .lose { color:var(--red); }
+  .tie { color:var(--orange); }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:16px; margin:12px 0; }
+  .verdict { font-size:1.15em; }
+  code { background:#1c2333; padding:1px 5px; border-radius:3px; color:var(--accent); }
+  hr { border-color:var(--border); margin:20px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📊 方案对比：HC-12 vs SX1278 LoRa</h1>
+
+<!-- ===== 核心参数对比 ===== -->
+<h2>1. 硬件参数对比</h2>
+<table>
+  <tr><th>对比维度</th><th>方案 A: HC-12 + Nano + Pro Micro 5V</th><th>方案 B: SX1278 LoRa + Pro Micro 3.3V</th></tr>
+  <tr>
+    <td>无线芯片</td>
+    <td>SI4463 (FSK/GFSK)</td>
+    <td class="win">SX1278 (LoRa 扩频)</td>
+  </tr>
+  <tr>
+    <td>频率</td>
+    <td>433.4 - 473.0 MHz</td>
+    <td>433MHz (410-525MHz)</td>
+  </tr>
+  <tr>
+    <td>最大发射功率</td>
+    <td>+20 dBm (100mW)</td>
+    <td class="win">+20 dBm (100mW) — 平手</td>
+  </tr>
+  <tr>
+    <td>接收灵敏度</td>
+    <td class="lose">-117 dBm @5Kbps</td>
+    <td class="win">-139 dBm @SF12 (LoRa)</td>
+  </tr>
+  <tr>
+    <td style="color:var(--accent);"><strong>理论最远距离</strong></td>
+    <td class="lose">~1000m (FU3 模式)</td>
+    <td class="win"><strong>~5000m+</strong> (空旷)</td>
+  </tr>
+  <tr>
+    <td>100-300m 室内/有遮挡</td>
+    <td class="lose">不稳定，穿墙可能断</td>
+    <td class="win"><strong>稳定穿透</strong>（LoRa 抗干扰强）</td>
+  </tr>
+  <tr>
+    <td>空中速率</td>
+    <td class="win">5Kbps (FU3) ~ 250Kbps</td>
+    <td class="lose">0.3Kbps - 37.5Kbps</td>
+  </tr>
+  <tr>
+    <td>接口方式</td>
+    <td class="win">UART 透传 (简单如串口)</td>
+    <td>SPI 接口 (需要协议库)</td>
+  </tr>
+  <tr>
+    <td>模块价格(单个)</td>
+    <td class="win">¥8-15</td>
+    <td>¥12-20</td>
+  </tr>
+  <tr>
+    <td>MCU</td>
+    <td>Nano(¥12) + Pro Micro 5V(¥15)</td>
+    <td>Pro Micro 3.3V (¥18-25)</td>
+  </tr>
+  <tr>
+    <td>电压匹配</td>
+    <td>HC-12 3.3V, Nano 5V → 需电平转换或直连</td>
+    <td class="win">SX1278 3.3V = Pro Micro 3.3V → 完美匹配</td>
+  </tr>
+  <tr>
+    <td>总 BOM 成本</td>
+    <td>约 ¥80-140</td>
+    <td>约 ¥85-150</td>
+  </tr>
+</table>
+
+<!-- ===== 穿透能力 ===== -->
+<h2>2. 最关键的差异：实际距离和穿墙</h2>
+<div class="card">
+  <table>
+    <tr><th>场景</th><th>HC-12</th><th>SX1278 LoRa</th></tr>
+    <tr><td>空旷户外</td><td>~800-1000m ✅</td><td class="win">~5000m+ ✅✅</td></tr>
+    <tr style="background:#1a2228"><td><strong>100m 隔 1-2 面墙</strong></td><td class="lose">❌ 可能掉线</td><td class="win">✅ 稳定</td></tr>
+    <tr><td><strong>300m 隔多面墙/建筑</strong></td><td class="lose">❌ 几乎不可能</td><td class="win">✅ 大概率可用</td></tr>
+    <tr><td>抗同频干扰</td><td class="lose">弱</td><td class="win">强（LoRa 扩频天然抗干扰）</td></tr>
+  </table>
+  <p style="margin-top:10px">
+    <strong>关键结论：</strong>HC-12 的 1000m 是在<span class="lose">空旷无遮挡</span>条件下。一旦有墙壁、建筑遮挡，距离会急剧缩水。
+    用户要求 100-300m 很可能不是纯空旷场景。SX1278 的 LoRa 扩频技术灵敏度比 FSK 高 <span class="win">22dB</span>，穿墙能力完全不在一个量级。
+  </p>
+</div>
+
+<!-- ===== 开发难度 ===== -->
+<h2>3. 开发难度对比</h2>
+<table>
+  <tr><th>方面</th><th>HC-12</th><th>SX1278 LoRa</th></tr>
+  <tr>
+    <td>通信方式</td>
+    <td class="win">UART 透传，<code>Serial.println("UP")</code> 搞定</td>
+    <td class="lose">SPI 协议 + RadioLib 库，约 30 行初始化代码</td>
+  </tr>
+  <tr>
+    <td>配置方式</td>
+    <td class="win">AT 指令（串口工具发 <code>AT+FU3</code>）</td>
+    <td>代码内注册配置（频率、SF、BW、CR、功率等）</td>
+  </tr>
+  <tr>
+    <td>上层代码量</td>
+    <td class="win">发射 ~25 行 / 接收 ~40 行</td>
+    <td>发射 ~55 行 / 接收 ~70 行</td>
+  </tr>
+  <tr>
+    <td>调试难度</td>
+    <td class="win">极低（串口监视器直接看到数据）</td>
+    <td>中等（SPI 接线、频率匹配等坑）</td>
+  </tr>
+  <tr>
+    <td>学习曲线</td>
+    <td class="win">Arduino 初学者 1 小时内搞定</td>
+    <td>需要理解 LoRa 参数，半天到一天</td>
+  </tr>
+</table>
+
+<!-- ===== 电压匹配 ===== -->
+<h2>4. 电压匹配（容易被忽略的坑）</h2>
+<div class="card">
+  <table>
+    <tr><th></th><th>HC-12</th><th>SX1278 + Pro Micro 3.3V</th></tr>
+    <tr><td>模块工作电压</td><td>3.2V - 5.5V</td><td class="win">1.8V - 3.6V</td></tr>
+    <tr><td>MCU 工作电压</td><td>Nano 5V / Pro Micro 5V</td><td class="win">Pro Micro 3.3V/8MHz</td></tr>
+    <tr><td>电平匹配</td><td class="lose">HC-12 逻辑是 3.3V, Nano IO 是 5V → 需注意</td><td class="win">3.3V = 3.3V → 无需任何转换</td></tr>
+    <tr><td>接收端供电</td><td>USB 5V → Pro Micro 5V → 给 HC-12</td><td class="win">USB 5V → Pro Micro 3.3V 稳压 → 3.3V 给 SX1278</td></tr>
+    <tr><td>发射端供电</td><td>18650(3.7V) → 升压 → 5V Nano</td><td class="win">18650(3.7V) → 直供 3.3V Pro Micro (1 节电池直驱)</td></tr>
+    <tr><td style="color:var(--accent);"><strong>发射端功耗</strong></td><td class="lose">Nano 5V: ~20mA 空载 + HC-12 100mA 发射</td><td class="win">Pro Micro 3.3V/8MHz: ~5mA 空载 + SX1278 120mA 发射</td></tr>
+    <tr><td>续航(2000mAh)</td><td>按需使用约 1-2 周</td><td class="win">按需使用约 3-6 周</td></tr>
+</table>
+</div>
+
+<!-- ===== 接收端 USB HID 注意事项 ===== -->
+<h2>5. ⚠️ 3.3V Pro Micro 的 USB HID 陷阱</h2>
+<div class="card">
+  <p><strong>3.3V/8MHz 版 Pro Micro</strong> 同样基于 ATmega32U4，<span class="win">原生支持 USB HID</span>，可以模拟键盘。</p>
+  <p>但需要注意：</p>
+  <ul>
+    <li>✅ Arduino IDE 中选择 <code>"SparkFun Pro Micro"</code> → 处理器选 <code>"ATmega32U4 (3.3V, 8MHz)"</code></li>
+    <li>✅ <code>Keyboard.h</code> 库在 3.3V 版上完全正常工作</li>
+    <li>⚠️ 烧录时需要把 HC-12/SX1278 的 SPI 线拔掉（占用 D14/D15/D16 可能冲突）</li>
+    <li>⚠️ 3.3V 版 8MHz 主频，对于简单串口/SPI 通信完全够用</li>
+  </ul>
+</div>
+
+<!-- ===== 最终建议 ===== -->
+<h2>🏆 最终对比结论</h2>
+
+<table>
+  <tr><th>维度</th><th>胜出</th><th>说明</th></tr>
+  <tr>
+    <td><strong>实际穿墙距离</strong></td>
+    <td class="win">SX1278 ⭐⭐⭐</td>
+    <td>LoRa 灵敏度高 22dB，这才是 100-300m 的底气</td>
+  </tr>
+  <tr>
+    <td><strong>可靠性/抗干扰</strong></td>
+    <td class="win">SX1278 ⭐⭐⭐</td>
+    <td>扩频天生抗干扰，FSK 在 433 频段容易被其他设备干扰</td>
+  </tr>
+  <tr>
+    <td><strong>电压匹配简洁</strong></td>
+    <td class="win">SX1278 ⭐⭐</td>
+    <td>全链路 3.3V，无需电平转换</td>
+  </tr>
+  <tr>
+    <td><strong>发射端续航</strong></td>
+    <td class="win">SX1278 ⭐⭐</td>
+    <td>3.3V Pro Micro 更省电</td>
+  </tr>
+  <tr>
+    <td><strong>开发简单度</strong></td>
+    <td class="win">HC-12 ⭐⭐⭐</td>
+    <td>UART 透传 = 零门槛</td>
+  </tr>
+  <tr>
+    <td><strong>成本</strong></td>
+    <td class="tie">持平</td>
+    <td>总价差不到 20 元</td>
+  </tr>
+  <tr>
+    <td><strong>调试友好度</strong></td>
+    <td class="win">HC-12 ⭐⭐</td>
+    <td>AT 指令配参，串口直读，排查问题快</td>
+  </tr>
+</table>
+
+<div class="card verdict">
+  <h2 style="margin-top:0;color:var(--accent);">📌 最终建议</h2>
+
+  <p><strong>如果你的 100-300m 是纯空旷户外：</strong>两个方案都行，HC-12 足够且开发更快。</p>
+  
+  <p style="margin-top:10px;"><strong>如果有任何遮挡（墙壁/建筑/室内到室外）：</strong><span class="win" style="font-size:1.1em;">强烈推荐你的 SX1278 + Pro Micro 3.3V 方案</span>。</p>
+
+  <p style="margin-top:12px;color:var(--green);font-size:1.1em;">
+    🏆 <strong>你的方案更好。</strong>虽然 HC-12 开发更简单，但 LoRa 的穿墙能力和可靠性是这颗芯片的天生优势。
+    100-300m 的距离用 HC-12 是在赌运气（空旷无遮挡），用 SX1278 是稳稳当当。
+    多花 20 元和半天开发时间换取"一定好用"，完全值得。
+  </p>
+</div>
+
+<hr>
+<p style="text-align:center;color:var(--accent);">方案对比 v1.0 — 2026-06-21</p>
+
+</div>
+</body>
+</html>

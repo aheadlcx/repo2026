@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAS IPv6 → 办公室 IPv4 访问方案：Lucky + Cloudflare 完整教程</title>
+<style>
+  :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#c9d1d9; --accent:#58a6ff; --green:#3fb950; --orange:#d2991d; --red:#f85149; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system,"Segoe UI",Helvetica,Arial,sans-serif; background:var(--bg); color:var(--text); line-height:1.8; padding:20px; }
+  .container { max-width:1100px; margin:0 auto; }
+  h1 { font-size:1.8em; color:var(--accent); border-bottom:2px solid var(--border); padding-bottom:10px; margin:24px 0 16px; }
+  h2 { font-size:1.35em; color:var(--green); margin:28px 0 12px; padding:10px 14px; background:var(--card); border-left:4px solid var(--green); border-radius:0 8px 8px 0; }
+  h3 { font-size:1.1em; color:var(--orange); margin:18px 0 8px; }
+  p { margin:8px 0; }
+  ul,ol { margin:8px 0 8px 24px; }
+  li { margin:5px 0; }
+  code { background:#1c2333; padding:1px 5px; border-radius:3px; font-family:"SF Mono","Fira Code",monospace; font-size:0.9em; color:var(--accent); }
+  pre { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:14px; overflow-x:auto; margin:12px 0; font-size:0.85em; }
+  table { width:100%; border-collapse:collapse; margin:12px 0; }
+  th,td { border:1px solid var(--border); padding:10px 14px; text-align:left; }
+  th { background:var(--card); color:var(--accent); }
+  tr:nth-child(even) { background:#0f1319; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:18px; margin:14px 0; }
+  .highlight { color:var(--green); font-weight:bold; }
+  .warn { color:var(--orange); font-weight:bold; }
+  .red { color:var(--red); }
+  .step { background:var(--card); border-left:4px solid var(--accent); padding:12px 16px; margin:10px 0; border-radius:0 8px 8px 0; }
+  .step-num { display:inline-block; background:var(--accent); color:#000; width:26px; height:26px; line-height:26px; text-align:center; border-radius:50%; font-weight:bold; margin-right:8px; }
+  .diagram { background:var(--card); border:2px dashed var(--border); border-radius:10px; padding:20px; text-align:center; margin:14px 0; font-family:"SF Mono",monospace; line-height:2; }
+  .flow-arrow { color:var(--accent); font-size:1.2em; }
+  hr { border-color:var(--border); margin:24px 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🌐 NAS IPv6 → 办公室 IPv4 访问方案<br><small style="color:var(--text);font-size:0.6em;">Lucky + Cloudflare 完整图文教程</small></h1>
+
+<div class="card">
+  <h3>📋 场景描述</h3>
+  <ul>
+    <li><strong>NAS</strong>：飞牛 OS，只有 <span class="highlight">IPv6 公网地址</span></li>
+    <li><strong>办公室</strong>：只能访问 <span class="highlight">IPv4</span>，无法直接访问 IPv6</li>
+    <li><strong>需求</strong>：在办公室通过域名访问家里的 NAS 服务</li>
+  </ul>
+</div>
+
+<!-- ============ 核心原理 ============ -->
+<h2>💡 核心原理：Cloudflare 充当 IPv4↔IPv6 桥梁</h2>
+
+<div class="diagram">
+  <pre style="background:none;border:none;text-align:left;display:inline-block;line-height:2.2">
+┌──────────────┐         ┌─────────────────┐         ┌──────────────┐
+│  办公室电脑   │ ─IPv4→  │  Cloudflare CDN  │ ─IPv6→  │  家里的 NAS   │
+│  (只有 IPv4)  │         │  (双栈: v4+v6)   │         │  (只有 IPv6)  │
+└──────────────┘         └─────────────────┘         └──────────────┘
+                                  ↑
+                           Lucky 定时更新
+                           AAAA 记录 (DDNS)
+  </pre>
+</div>
+
+<div class="card">
+  <p><strong>Cloudflare 的 CDN 节点同时支持 IPv4 和 IPv6</strong>，当你开启代理（橙色云朵）后：</p>
+  <ol>
+    <li>办公室用 IPv4 访问 <code>nas.example.com</code> → DNS 解析到 Cloudflare 的 IPv4 节点</li>
+    <li>Cloudflare 节点用 IPv6 连接到你 NAS 的真实 IPv6 地址</li>
+    <li>数据在 Cloudflare 节点中转 → <span class="highlight">完美桥接 IPv4 和 IPv6</span></li>
+  </ol>
+</div>
+
+<!-- ============ 方案对比 ============ -->
+<h2>📊 三种方案对比</h2>
+
+<table>
+  <tr><th>方案</th><th>原理</th><th>难度</th><th>稳定性</th><th>端口限制</th><th>推荐</th></tr>
+  <tr style="background:#1a2a1a">
+    <td class="highlight">Cloudflare DNS 代理</td>
+    <td>AAAA 记录 + 橙色云朵，Cloudflare 自动 v4↔v6 桥接</td>
+    <td>⭐⭐ 简单</td>
+    <td>⭐⭐⭐⭐⭐</td>
+    <td>仅 HTTP/HTTPS 端口</td>
+    <td class="highlight">⭐ 首选</td>
+  </tr>
+  <tr>
+    <td>Cloudflare Tunnel</td>
+    <td>NAS 安装 cloudflared，建出站隧道</td>
+    <td>⭐⭐⭐ 中等</td>
+    <td>⭐⭐⭐⭐⭐</td>
+    <td>支持任意 TCP</td>
+    <td>备选</td>
+  </tr>
+  <tr>
+    <td>frp / 内网穿透</td>
+    <td>需一台 IPv4 公网 VPS 中转</td>
+    <td>⭐⭐⭐⭐</td>
+    <td>⭐⭐⭐</td>
+    <td>灵活</td>
+    <td>成本高</td>
+  </tr>
+</table>
+
+<!-- ============ 前提条件 ============ -->
+<h2>📦 前提条件</h2>
+<div class="card">
+  <table>
+    <tr><td>1</td><td>拥有一个<strong>域名</strong>，并将 DNS 托管到 <span class="highlight">Cloudflare</span></td></tr>
+    <tr><td>2</td><td>NAS 上已安装 <strong>Lucky</strong>（飞牛 OS 应用商店可装）</td></tr>
+    <tr><td>3</td><td>NAS 的 IPv6 地址能正常访问（手机 5G 网络测试 <code>http://[IPv6地址]:端口</code>）</td></tr>
+    <tr><td>4</td><td>Cloudflare 账号（免费即可）</td></tr>
+  </table>
+</div>
+
+<!-- ============ 方案一 ============ -->
+<h2>方案一：Cloudflare DNS 代理（推荐 ⭐）</h2>
+
+<h3>Step 1：将域名 DNS 托管到 Cloudflare</h3>
+
+<div class="step"><span class="step-num">1</span>注册/登录 <a target="_blank" href="https://dash.cloudflare.com">Cloudflare 控制台</a> → 添加站点 → 输入你的域名</div>
+<div class="step"><span class="step-num">2</span>Cloudflare 会给你两个 NS 地址（如 <code>abby.ns.cloudflare.com</code>），去你的域名注册商处修改 NS 记录</div>
+<div class="step"><span class="step-num">3</span>等待 NS 生效（通常 10 分钟 ~ 2 小时），Cloudflare 显示 "Active" 即完成</div>
+
+<h3>Step 2：获取 Cloudflare API Token</h3>
+
+<div class="step"><span class="step-num">1</span>Cloudflare 控制台 → 右上角头像 → <strong>My Profile</strong> → <strong>API Tokens</strong></div>
+<div class="step"><span class="step-num">2</span>点击 <strong>Create Token</strong> → 选择 <strong>"Edit zone DNS"</strong> 模板</div>
+<div class="step"><span class="step-num">3</span>Zone Resources 选择你的域名 → 点击 <strong>Continue to summary</strong> → <strong>Create Token</strong></div>
+<div class="step"><span class="step-num">4</span><span class="warn">⚠️ 立即复制保存 Token！</span>页面关闭后无法再次查看。</div>
+
+<div class="card">
+  <p><strong>Cloudflare API Token 格式</strong>（供后续 Lucky 配置用）：</p>
+  <pre><code>Zone ID:   在 Cloudflare 域名概览页右侧可复制
+API Token: 刚才创建的 token (如 aBcDeFgHiJkLmNoPqRsTuVwXyZ1234567890)</code></pre>
+</div>
+
+<h3>Step 3：在 Lucky 中配置 DDNS</h3>
+
+<div class="step"><span class="step-num">1</span>打开 NAS 的 Lucky 管理页面（默认端口 <code>16601</code>）→ 左侧菜单 <strong>动态域名</strong></div>
+<div class="step"><span class="step-num">2</span>点击 <strong>添加</strong>，填写以下信息：</div>
+
+<table>
+  <tr><th>配置项</th><th>填写内容</th><th>说明</th></tr>
+  <tr><td>DDNS 服务商</td><td><code>Cloudflare</code></td><td>下拉选择</td></tr>
+  <tr><td>域名</td><td><code>nas.example.com</code></td><td>要访问的子域名</td></tr>
+  <tr><td>记录类型</td><td class="highlight">AAAA (IPv6)</td><td>NAS 只有 IPv6，必须选 AAAA</td></tr>
+  <tr><td>获取 IP 方式</td><td>网卡获取 / 接口获取</td><td>选 NAS 实际使用的网卡</td></tr>
+  <tr><td>Proxy (代理)</td><td class="highlight">✅ 开启</td><td>这就是橙色云朵，关键开关！</td></tr>
+  <tr><td>TTL</td><td>120 (自动)</td><td>保持默认</td></tr>
+  <tr><td>API Token</td><td>粘贴刚才创建的 Token</td><td></td></tr>
+  <tr><td>Zone ID</td><td>粘贴 Zone ID</td><td></td></tr>
+</table>
+
+<div class="card">
+  <h3>🔑 Proxy（橙色云朵）是关键！</h3>
+  <p>开启 Proxy 后，DNS 解析返回的是 <span class="highlight">Cloudflare 的 IPv4 地址</span>，而不是你 NAS 的 IPv6 地址。</p>
+  <p>Cloudflare 收到请求后，通过 IPv6 回源到你的 NAS → 自动完成 v4↔v6 转换。</p>
+  <pre><code>
+  DNS 查询 nas.example.com:
+  
+  Proxy OFF (灰色云朵):
+    → 返回 240e:xxx:xxx:xxx  (你的 IPv6)
+    → 办公室 IPv4 无法连接 ❌
+  
+  Proxy ON (橙色云朵): ✅
+    → 返回 104.21.xx.xx  (Cloudflare IPv4)
+    → 办公室 IPv4 正常访问 ✅
+    → Cloudflare 内部用 IPv6 回源到你的 NAS ✅</code></pre>
+</div>
+
+<h3>Step 4：配置 Cloudflare 防火墙规则（端口放行）</h3>
+
+<div class="step"><span class="step-num">1</span>Cloudflare 控制台 → 你的域名 → <strong>DNS</strong> → <strong>Records</strong></div>
+<div class="step"><span class="step-num">2</span>确认 Lucky 自动创建的 AAAA 记录存在，且为 <span class="highlight">橙色云朵 (Proxied)</span></div>
+<div class="step"><span class="step-num">3</span>Cloudflare 免费版默认只代理以下端口：</div>
+
+<table>
+  <tr><th>协议</th><th>支持的端口</th></tr>
+  <tr><td>HTTP</td><td>80, 8080, 8880, 2052, 2082, 2086, 2095</td></tr>
+  <tr><td>HTTPS</td><td>443, 2053, 2083, 2087, 2096, 8443</td></tr>
+</table>
+
+<p style="margin-top:12px">
+  <span class="warn">⚠️ 重要：</span>你的 NAS 服务端口必须落在上表中。比如飞牛 OS 默认端口是 <code>5666/5667</code>，不在支持列表中。解决方案：
+</p>
+<ol>
+  <li><strong>方法 A（推荐）</strong>：在 Lucky 中设置<strong>反向代理</strong>，把 5666 映射到 443/8443</li>
+  <li><strong>方法 B</strong>：使用 Lucky 的 Web 服务功能做转发</li>
+  <li><strong>方法 C</strong>：直接用 Cloudflare Tunnel（方案二），无端口限制</li>
+</ol>
+
+<h3>Step 5：Lucky 反向代理配置（端口映射）</h3>
+
+<div class="step"><span class="step-num">1</span>Lucky → <strong>Web 服务</strong> → <strong>添加 Web 服务规则</strong></div>
+<div class="step"><span class="step-num">2</span>配置如下：</div>
+
+<table>
+  <tr><th>配置项</th><th>值</th><th>说明</th></tr>
+  <tr><td>监听端口</td><td><code>8443</code></td><td>Cloudflare 支持的 HTTPS 端口</td></tr>
+  <tr><td>启用 TLS</td><td>✅ 开启</td><td>使用 Cloudflare 的免费证书或自签</td></tr>
+  <tr><td>反向代理目标</td><td><code>http://127.0.0.1:5666</code></td><td>飞牛 OS 的本地地址</td></tr>
+  <tr><td>前端域名</td><td><code>nas.example.com</code></td><td>与 DDNS 域名一致</td></tr>
+</table>
+
+<div class="step"><span class="step-num">3</span>Cloudflare → SSL/TLS → 加密模式选择 <strong>Full</strong> 或 <strong>Flexible</strong></div>
+
+<h3>Step 6：Cloudflare SSL/TLS 配置</h3>
+
+<div class="card">
+  <table>
+    <tr><th>模式</th><th>流量加密</th><th>适用场景</th></tr>
+    <tr><td>Flexible</td><td>用户↔CF 加密, CF↔NAS 明文</td><td>NAS 无 HTTPS, 最简单</td></tr>
+    <tr><td class="highlight">Full</td><td>全程加密</td><td>NAS 有自签证书, 推荐</td></tr>
+    <tr><td>Full (Strict)</td><td>全程加密 + 证书验证</td><td>NAS 有受信证书</td></tr>
+  </table>
+  <p style="margin-top:10px">推荐使用 <span class="highlight">Full</span> 模式。Lucky 自带证书管理，可以配合使用。</p>
+</div>
+
+<h3>Step 7：验证</h3>
+
+<ol>
+  <li>办公室电脑打开浏览器 → <code>https://nas.example.com:8443</code></li>
+  <li>手机用 5G（IPv6）→ 访问 <code>http://[NAS_IPv6]:5666</code> → 确认 NAS 本身可达</li>
+  <li>Cloudflare 控制台 → Analytics → 看到流量经过代理</li>
+</ol>
+
+<!-- ============ 方案二 ============ -->
+<h2>方案二：Cloudflare Tunnel（备选，无端口限制）</h2>
+
+<p>如果方案一的端口限制无法满足需求（比如需要访问非标准端口），可以用 Cloudflare Tunnel。</p>
+
+<h3>原理</h3>
+<div class="diagram">
+  <pre style="background:none;border:none;text-align:left;display:inline-block">
+  NAS (cloudflared) ──出站隧道──→ Cloudflare 边缘 ──→ 用户 (IPv4/IPv6)
+  (无需任何公网 IP)
+  </pre>
+</div>
+
+<h3>Step 1：安装 cloudflared</h3>
+
+<div class="step"><span class="step-num">1</span>SSH 连接到飞牛 OS（或通过 Lucky 的终端功能）</div>
+<div class="step"><span class="step-num">2</span>下载安装 cloudflared：</div>
+<pre><code># 下载 cloudflared (amd64)
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64 -o /usr/local/bin/cloudflared
+chmod +x /usr/local/bin/cloudflared
+
+# 验证
+cloudflared --version</code></pre>
+
+<h3>Step 2：创建 Tunnel</h3>
+
+<pre><code># 登录 Cloudflare
+cloudflared tunnel login
+# 浏览器会弹出授权页面，选择你的域名
+
+# 创建隧道
+cloudflared tunnel create nas-tunnel
+# 记下返回的 Tunnel ID (如 12345678-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+
+# 配置隧道
+mkdir -p ~/.cloudflared
+cat > ~/.cloudflared/config.yml << 'EOF'
+tunnel: 你的Tunnel-ID
+credentials-file: /root/.cloudflared/你的Tunnel-ID.json
+
+ingress:
+  # 飞牛 OS 主界面
+  - hostname: nas.example.com
+    service: http://localhost:5666
+  
+  # 可以添加更多服务
+  - hostname: jellyfin.example.com
+    service: http://localhost:8096
+  
+  # 默认规则（必须放在最后）
+  - service: http_status:404
+EOF</code></pre>
+
+<h3>Step 3：添加 DNS 记录 + 启动隧道</h3>
+
+<pre><code># cloudflared 会自动创建 DNS CNAME 记录
+cloudflared tunnel route dns nas-tunnel nas.example.com
+
+# 安装为系统服务，开机自启
+cloudflared service install
+
+# 启动
+systemctl start cloudflared
+systemctl status cloudflared</code></pre>
+
+<div class="card">
+  <p><strong>Tunnel 方案优点：</strong></p>
+  <ul>
+    <li>✅ 无需 Lucky DDNS（Tunnel 自动保持连接）</li>
+    <li>✅ 无需公网 IP（连 IPv6 都不需要）</li>
+    <li>✅ 无端口限制（可代理任意 TCP 服务）</li>
+    <li>✅ Cloudflare 自带 DDoS 防护 + CDN 加速</li>
+  </ul>
+</div>
+
+<!-- ============ 方案三 ============ -->
+<h2>方案三：Lucky 反向代理 + Cloudflare（进阶）</h2>
+
+<p>将 Lucky 的 "Web 服务" 和 Cloudflare 配合，可以实现更灵活的代理：</p>
+
+<pre><code>
+  用户 (IPv4)
+    │
+    ▼
+  Cloudflare CDN (端口 443)
+    │  IPv6 回源
+    ▼
+  Lucky 反向代理 (端口 8443)
+    ├── nas.example.com       → http://127.0.0.1:5666   (飞牛 OS)
+    ├── jellyfin.example.com  → http://127.0.0.1:8096   (Jellyfin)
+    └── file.example.com      → http://127.0.0.1:8080   (文件管理)
+</code></pre>
+
+<p>所有子域名的 AAAA 记录（橙色云朵）都指向 NAS IPv6，Lucky 根据 <code>Host</code> 头分发到不同后端服务。</p>
+
+<!-- ============ Lucky 配置汇总 ============ -->
+<h2>📋 Lucky 核心配置汇总</h2>
+
+<div class="card">
+  <h3>1. 动态域名 (DDNS)</h3>
+  <table>
+    <tr><td>服务商</td><td>Cloudflare</td></tr>
+    <tr><td>记录类型</td><td class="highlight">AAAA (IPv6)</td></tr>
+    <tr><td>Proxy</td><td class="highlight">✅ 开启 (橙色云朵)</td></tr>
+    <tr><td>更新间隔</td><td>300 秒 (5 分钟)</td></tr>
+  </table>
+
+  <h3 style="margin-top:16px">2. Web 服务 (反向代理)</h3>
+  <table>
+    <tr><td>监听端口</td><td>8443 (Cloudflare 支持的 HTTPS 端口)</td></tr>
+    <tr><td>目标地址</td><td>http://127.0.0.1:5666</td></tr>
+    <tr><td>TLS</td><td>✅ 开启</td></tr>
+  </table>
+</div>
+
+<!-- ============ 常见问题 ============ -->
+<h2>❓ 常见问题</h2>
+
+<table>
+  <tr><th>问题</th><th>原因</th><th>解决</th></tr>
+  <tr>
+    <td>办公室能 ping 通域名但无法访问</td>
+    <td>端口不在 Cloudflare 代理范围内</td>
+    <td>改用 8443/2053 等支持的端口</td>
+  </tr>
+  <tr>
+    <td>提示 521/522 错误</td>
+    <td>Cloudflare 无法连接到 NAS 的 IPv6</td>
+    <td>检查 NAS 防火墙、IPv6 是否可达、Lucky 代理端口是否正常</td>
+  </tr>
+  <tr>
+    <td>DDNS 更新了但访问的还是旧 IP</td>
+    <td>TTL 缓存或 Lucky 未正确更新</td>
+    <td>降低 TTL 到 120, 查看 Lucky 日志确认更新成功</td>
+  </tr>
+  <tr>
+    <td>IPv6 地址经常变化</td>
+    <td>运营商动态分配</td>
+    <td>Lucky 的自动 DDNS 更新可解决, 缩短间隔到 120s</td>
+  </tr>
+  <tr>
+    <td>Cloudflare 代理速度慢</td>
+    <td>回源走国际线路</td>
+    <td>正常现象, 几百 ms 延迟可接受; 如需低延迟考虑 Tunnel</td>
+  </tr>
+  <tr>
+    <td>飞牛 OS 应用商店没有 Lucky</td>
+    <td>镜像源未收录</td>
+    <td>SSH 进 NAS 用 Docker 安装: <code>docker run -d --net=host --restart=always --name lucky gdy666/lucky</code></td>
+  </tr>
+</table>
+
+<!-- ============ 飞牛 OS 特有 ============ -->
+<h2>🍀 飞牛 OS 特别说明</h2>
+
+<div class="card">
+  <ul>
+    <li>飞牛 OS 基于 Debian，支持 Docker 和 apt 安装软件</li>
+    <li>默认 Web 管理端口：<code>5666</code> (HTTP) / <code>5667</code> (HTTPS)</li>
+    <li>Lucky 默认端口：<code>16601</code></li>
+    <li>如果飞牛 OS 应用商店有 Lucky，直接在商店安装最方便</li>
+    <li>SSH 登录：<code>ssh your-user@NAS_IPv6地址</code></li>
+    <li><span class="warn">如果 IPv6 防火墙挡住了入站流量</span>：飞牛 OS → 设置 → 防火墙 → 放行需要的端口</li>
+  </ul>
+</div>
+
+<hr>
+
+<div class="card" style="text-align:center">
+  <p>📐 文档版本: v1.0 | 📅 2026-06-24</p>
+  <p style="color:var(--accent);">NAS IPv6 Only → Lucky DDNS + Cloudflare Proxy → 办公室 IPv4 无障碍访问</p>
+</div>
+
+</div>
+</body>
+</html>

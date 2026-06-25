@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>433MHz 无线翻页遥控器 — 全套软硬件方案</title>
+<style>
+  :root { --bg:#0d1117; --card:#161b22; --border:#30363d; --text:#c9d1d9; --accent:#58a6ff; --green:#3fb950; --orange:#d2991d; --red:#f85149; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; background:var(--bg); color:var(--text); line-height:1.7; padding:20px; }
+  .container { max-width:1100px; margin:0 auto; }
+  h1 { font-size:2em; color:var(--accent); border-bottom:2px solid var(--border); padding-bottom:12px; margin:30px 0 20px; }
+  h2 { font-size:1.5em; color:var(--green); margin:30px 0 15px; padding:10px 14px; background:var(--card); border-left:4px solid var(--green); border-radius:0 6px 6px 0; }
+  h3 { font-size:1.2em; color:var(--orange); margin:20px 0 10px; }
+  p { margin:10px 0; }
+  ul, ol { margin:10px 0 10px 24px; }
+  li { margin:6px 0; }
+  code { background:#1c2333; padding:2px 6px; border-radius:4px; font-family:"SF Mono", "Fira Code", monospace; font-size:0.9em; color:var(--accent); }
+  pre { background:var(--card); border:1px solid var(--border); border-radius:8px; padding:16px; overflow-x:auto; margin:14px 0; font-size:0.85em; }
+  pre code { background:none; padding:0; color:var(--text); }
+  table { width:100%; border-collapse:collapse; margin:16px 0; }
+  th, td { border:1px solid var(--border); padding:10px 14px; text-align:left; }
+  th { background:var(--card); color:var(--accent); font-weight:600; }
+  tr:nth-child(even) { background:#0f1319; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:10px; padding:20px; margin:16px 0; }
+  .highlight { color:var(--green); font-weight:bold; }
+  .warn { color:var(--orange); font-weight:bold; }
+  .err { color:var(--red); font-weight:bold; }
+  .step { background:var(--card); border-left:4px solid var(--accent); padding:12px 18px; margin:12px 0; border-radius:0 8px 8px 0; }
+  .step-num { display:inline-block; background:var(--accent); color:#000; width:28px; height:28px; line-height:28px; text-align:center; border-radius:50%; font-weight:bold; margin-right:10px; }
+  .arch-box { display:flex; gap:20px; flex-wrap:wrap; margin:16px 0; }
+  .arch-item { flex:1; min-width:280px; background:var(--card); border:2px solid var(--border); border-radius:10px; padding:18px; text-align:center; }
+  .arch-item h3 { margin-top:0; }
+  .arrow { font-size:2em; color:var(--accent); align-self:center; }
+  .link-btn { display:inline-block; background:var(--accent); color:#000; padding:6px 14px; border-radius:6px; text-decoration:none; font-weight:600; font-size:0.9em; }
+  .link-btn:hover { opacity:0.8; }
+  pre .comment { color:#8b949e; }
+  pre .keyword { color:#ff7b72; }
+  pre .string { color:#a5d6ff; }
+  hr { border:none; border-top:1px solid var(--border); margin:30px 0; }
+  @media print { body { background:#fff; color:#000; } .card, pre, th { background:#f5f5f5; } }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>📡 433MHz 无线翻页遥控器 — 全套软硬件方案</h1>
+
+<div class="card">
+  <h3>📋 需求概述</h3>
+  <ul>
+    <li>遥控器(发射端)通过 <code>433MHz</code> 无线发送「上一页/下一页」指令</li>
+    <li>接收器连接电脑 USB，模拟 <code>Page Up</code> / <code>Page Down</code> 键盘按键</li>
+    <li>遥控距离：<span class="highlight">100-300 米</span></li>
+    <li>完整 BOM 物料清单 + 软件源码 + 步骤文档</li>
+  </ul>
+</div>
+
+<!-- ============ 架构总览 ============ -->
+<h2>🏗️ 系统架构</h2>
+
+<div class="arch-box">
+  <div class="arch-item">
+    <h3>🔴 发射端 (遥控器)</h3>
+    <p>Arduino Nano<br>+ HC-12 433MHz 模块<br>+ 2 个按键<br>+ 18650 锂电池</p>
+  </div>
+  <div class="arrow">→</div>
+  <div class="arch-item" style="border-color:var(--green);">
+    <h3>📶 433MHz 无线传输</h3>
+    <p>HC-12 模块<br>最大 1000 米<br>空中速率 5Kbps</p>
+  </div>
+  <div class="arrow">→</div>
+  <div class="arch-item" style="border-color:var(--orange);">
+    <h3>🟢 接收端 (接收器)</h3>
+    <p>Arduino Pro Micro<br>+ HC-12 433MHz<br>→ USB HID 键盘<br>→ Page Up / Down</p>
+  </div>
+  <div class="arrow">→</div>
+  <div class="arch-item" style="border-color:var(--accent);">
+    <h3>💻 电脑</h3>
+    <p>识别为 USB 键盘<br>接收 Page Up/Down<br>键码控制翻页</p>
+  </div>
+</div>
+
+<!-- ============ BOM ============ -->
+<h2>📦 物料清单 (BOM)</h2>
+
+<table>
+  <tr><th>序号</th><th>物料名称</th><th>规格/型号</th><th>数量</th><th>单价(参考)</th><th>用途</th><th>购买渠道</th></tr>
+  <tr><td>1</td><td>HC-12 无线串口模块</td><td>SI4463, 433MHz, 3.3V</td><td>2</td><td>¥15-25</td><td>TX + RX 无线通信</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=HC-12+SI4463+433M">淘宝</a></td></tr>
+  <tr><td>2</td><td>Arduino Pro Micro</td><td>ATmega32U4, 5V/16MHz</td><td>1</td><td>¥15-30</td><td>接收端 MCU (USB HID)</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=Arduino+Pro+Micro+ATmega32U4">淘宝</a></td></tr>
+  <tr><td>3</td><td>Arduino Nano</td><td>ATmega328P, 5V/16MHz</td><td>1</td><td>¥12-20</td><td>发射端 MCU</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=Arduino+Nano+V3+CH340">淘宝</a></td></tr>
+  <tr><td>4</td><td>18650 锂电池</td><td>3.7V, ≥2000mAh</td><td>1</td><td>¥8-15</td><td>遥控器供电</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=18650+锂电池">淘宝</a></td></tr>
+  <tr><td>5</td><td>18650 电池盒</td><td>单节带开关</td><td>1</td><td>¥3-5</td><td>电池安装</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=18650电池盒+单节">淘宝</a></td></tr>
+  <tr><td>6</td><td>TP4056 充电模块</td><td>USB-C 或 MicroUSB</td><td>1</td><td>¥2-5</td><td>锂电池充电</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=TP4056+充电模块">淘宝</a></td></tr>
+  <tr><td>7</td><td>轻触按键 (按钮)</td><td>6x6mm 或 12x12mm</td><td>2</td><td>¥0.5-1</td><td>上一页/下一页按键</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=轻触按键+12x12">淘宝</a></td></tr>
+  <tr><td>8</td><td>LED 指示灯 (可选)</td><td>3mm 红色 + 绿色</td><td>2</td><td>¥0.5</td><td>TX/RX 状态指示</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=LED+3mm">淘宝</a></td></tr>
+  <tr><td>9</td><td>10KΩ 电阻</td><td>1/4W 碳膜</td><td>4</td><td>¥0.2</td><td>上拉/限流</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=10K+电阻">淘宝</a></td></tr>
+  <tr><td>10</td><td>220Ω 电阻</td><td>1/4W 碳膜</td><td>2</td><td>¥0.2</td><td>LED 限流</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=220欧+电阻">淘宝</a></td></tr>
+  <tr><td>11</td><td>排针 / 杜邦线</td><td>公母各一套</td><td>若干</td><td>¥3-5</td><td>模块连接</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=杜邦线+排针">淘宝</a></td></tr>
+  <tr><td>12</td><td>外壳 (可选)</td><td>3D 打印 / 塑料盒</td><td>2</td><td>¥5-20</td><td>封装保护</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=塑料+防水盒+DIY">淘宝</a></td></tr>
+  <tr><td>13</td><td>MicroUSB 数据线</td><td>标准 USB-Micro</td><td>1</td><td>¥3-5</td><td>接收端连接电脑</td><td><a class="link-btn" target="_blank" href="https://s.taobao.com/search?q=MicroUSB数据线">淘宝</a></td></tr>
+  <tr class="highlight"><td colspan="3"><strong>总计</strong></td><td></td><td><strong>¥80-140</strong></td><td colspan="2">根据具体选品浮动</td></tr>
+</table>
+
+<div class="card">
+  <h3>🔑 核心器件说明</h3>
+  <table>
+    <tr><th>器件</th><th>为什么选它</th></tr>
+    <tr><td><strong>HC-12</strong></td><td>433MHz, UART 透传, 最大 <span class="highlight">1000m</span> 空旷距离, 轻松满足 100-300m 需求。比 FS1000A(50m) 和 nRF24L01(100m) 更强。</td></tr>
+    <tr><td><strong>Arduino Pro Micro</strong></td><td>ATmega32U4 芯片原生支持 <span class="highlight">USB HID</span>, 插上电脑直接识别为键盘, 无需装驱动。</td></tr>
+    <tr><td><strong>Arduino Nano</strong></td><td>小巧省电, 5V 供电可直接用 18650 升压, 编程简单。</td></tr>
+  </table>
+</div>
+
+<!-- ============ 接线图 ============ -->
+<h2>🔌 接线图</h2>
+
+<div class="arch-box">
+  <div class="arch-item">
+    <h3>🔴 发射端接线</h3>
+    <table style="font-size:0.85em">
+      <tr><th>Arduino Nano</th><th>→</th><th>HC-12</th></tr>
+      <tr><td>5V / VIN</td><td>→</td><td>VCC</td></tr>
+      <tr><td>GND</td><td>→</td><td>GND</td></tr>
+      <tr><td>D2 (TX)</td><td>→</td><td>RX</td></tr>
+      <tr><td>D3 (RX)</td><td>→</td><td>TX</td></tr>
+      <tr><td colspan="3"></td></tr>
+      <tr><th>Arduino Nano</th><th>→</th><th>按键</th></tr>
+      <tr><td>D4</td><td>→</td><td>按键A (Page Up)</td></tr>
+      <tr><td>D5</td><td>→</td><td>按键B (Page Down)</td></tr>
+      <tr><td>GND</td><td>→</td><td>按键公共端</td></tr>
+      <tr><td colspan="3"></td></tr>
+      <tr><td>18650 电池 → TP4056 → 升压 → Arduino VIN</td><td></td><td></td></tr>
+    </table>
+  </div>
+  <div class="arch-item" style="border-color:var(--green)">
+    <h3>🟢 接收端接线</h3>
+    <table style="font-size:0.85em">
+      <tr><th>Pro Micro</th><th>→</th><th>HC-12</th></tr>
+      <tr><td>VCC (5V)</td><td>→</td><td>VCC</td></tr>
+      <tr><td>GND</td><td>→</td><td>GND</td></tr>
+      <tr><td>D2 (RX)</td><td>→</td><td>TX</td></tr>
+      <tr><td>D3 (TX)</td><td>→</td><td>RX</td></tr>
+      <tr><td colspan="3"></td></tr>
+      <tr><th>Pro Micro</th><th>→</th><th>LED</th></tr>
+      <tr><td>D4</td><td>→</td><td>LED (绿) + 220Ω → GND</td></tr>
+    </table>
+    <p style="margin-top:10px;font-size:0.85em">Pro Micro 直接通过 USB 连接电脑即可供电</p>
+  </div>
+</div>
+
+<!-- ============ 软件方案 ============ -->
+<h2>💻 软件方案</h2>
+
+<h3>3.1 发射端 (Arduino Nano) — 固件代码</h3>
+
+<div class="step">
+  <span class="step-num">1</span> <strong>开发环境</strong>：安装 <a target="_blank" href="https://www.arduino.cc/en/software">Arduino IDE</a>，选择开发板 "Arduino Nano"，处理器 "ATmega328P (Old Bootloader)"
+</div>
+<div class="step">
+  <span class="step-num">2</span> <strong>安装库</strong>：项目 → 加载库 → 管理库 → 搜索安装 <code>SoftwareSerial</code>（IDE 自带，不需额外安装）
+</div>
+
+<pre><code><span class="comment">// ==========================================
+// 发射端 (TX) — Arduino Nano + HC-12
+// 按键按下 → 发送 Page Up / Page Down 指令
+// ==========================================</span>
+
+<span class="keyword">#include</span> <span class="string">&lt;SoftwareSerial.h&gt;</span>
+
+<span class="comment">// 引脚定义</span>
+<span class="keyword">#define</span> HC12_TX    2    <span class="comment">// HC-12 RX</span>
+<span class="keyword">#define</span> HC12_RX    3    <span class="comment">// HC-12 TX</span>
+<span class="keyword">#define</span> BTN_UP     4    <span class="comment">// 上一页按键</span>
+<span class="keyword">#define</span> BTN_DOWN   5    <span class="comment">// 下一页按键</span>
+
+SoftwareSerial hc12(HC12_TX, HC12_RX);
+
+<span class="keyword">void</span> <span class="highlight">setup</span>() {
+  <span class="keyword">pinMode</span>(BTN_UP,   INPUT_PULLUP);
+  <span class="keyword">pinMode</span>(BTN_DOWN, INPUT_PULLUP);
+  
+  hc12.<span class="keyword">begin</span>(9600);       <span class="comment">// HC-12 默认波特率 9600</span>
+  <span class="keyword">delay</span>(1000);
+}
+
+<span class="keyword">void</span> <span class="highlight">loop</span>() {
+  <span class="keyword">static</span> unsigned long lastSend = 0;
+  <span class="keyword">unsigned long</span> now = millis();
+  
+  <span class="comment">// 防抖 + 去重 (200ms 间隔)</span>
+  <span class="keyword">if</span> (now - lastSend > 200) {
+    <span class="keyword">if</span> (<span class="keyword">digitalRead</span>(BTN_UP) == LOW) {
+      hc12.<span class="keyword">println</span>(<span class="string">"UP"</span>);
+      lastSend = now;
+    }
+    <span class="keyword">if</span> (<span class="keyword">digitalRead</span>(BTN_DOWN) == LOW) {
+      hc12.<span class="keyword">println</span>(<span class="string">"DOWN"</span>);
+      lastSend = now;
+    }
+  }
+  
+  <span class="comment">// 低功耗优化（可选）：delay 替换为 sleep</span>
+  <span class="keyword">delay</span>(20);
+}
+</code></pre>
+
+<h3>3.2 接收端 (Arduino Pro Micro) — 固件代码</h3>
+
+<div class="step">
+  <span class="step-num">1</span> <strong>开发环境</strong>：Arduino IDE，选择开发板 "Arduino Micro" 或 "SparkFun Pro Micro" (ATmega32U4, 5V/16MHz)
+</div>
+<div class="step">
+  <span class="step-num">2</span> <strong>安装库</strong>：<code>Keyboard.h</code> (IDE 自带，ATmega32U4 原生支持)
+</div>
+
+<pre><code><span class="comment">// ==========================================
+// 接收端 (RX) — Arduino Pro Micro + HC-12
+// 接收无线指令 → 模拟 USB 键盘 Page Up/Down
+// ==========================================</span>
+
+<span class="keyword">#include</span> <span class="string">&lt;Keyboard.h&gt;</span>
+<span class="keyword">#include</span> <span class="string">&lt;SoftwareSerial.h&gt;</span>
+
+<span class="comment">// 引脚定义</span>
+<span class="keyword">#define</span> HC12_RX 2      <span class="comment">// HC-12 TX → Pro Micro RX</span>
+<span class="keyword">#define</span> HC12_TX 3      <span class="comment">// HC-12 RX → Pro Micro TX</span>
+<span class="keyword">#define</span> LED_PIN 4      <span class="comment">// 状态指示灯</span>
+
+SoftwareSerial hc12(HC12_RX, HC12_TX);
+String inputBuffer = "";
+
+<span class="keyword">void</span> <span class="highlight">setup</span>() {
+  <span class="keyword">pinMode</span>(LED_PIN, OUTPUT);
+  <span class="keyword">digitalWrite</span>(LED_PIN, LOW);
+  
+  hc12.<span class="keyword">begin</span>(9600);         <span class="comment">// HC-12 默认波特率</span>
+  Keyboard.<span class="keyword">begin</span>();           <span class="comment">// 初始化 USB HID 键盘</span>
+  
+  <span class="comment">// 启动闪烁 3 次表示就绪</span>
+  <span class="keyword">for</span> (<span class="keyword">int</span> i = 0; i < 3; i++) {
+    <span class="keyword">digitalWrite</span>(LED_PIN, HIGH);
+    <span class="keyword">delay</span>(200);
+    <span class="keyword">digitalWrite</span>(LED_PIN, LOW);
+    <span class="keyword">delay</span>(200);
+  }
+}
+
+<span class="keyword">void</span> <span class="highlight">loop</span>() {
+  <span class="keyword">while</span> (hc12.<span class="keyword">available</span>()) {
+    <span class="keyword">char</span> c = hc12.<span class="keyword">read</span>();
+    <span class="keyword">if</span> (c == '\n' || c == '\r') {
+      <span class="comment">// 收到完整指令</span>
+      inputBuffer.<span class="keyword">trim</span>();
+      
+      <span class="keyword">if</span> (inputBuffer == <span class="string">"UP"</span>) {
+        <span class="keyword">digitalWrite</span>(LED_PIN, HIGH);
+        Keyboard.<span class="keyword">press</span>(KEY_PAGE_UP);
+        <span class="keyword">delay</span>(50);
+        Keyboard.<span class="keyword">releaseAll</span>();
+        <span class="keyword">digitalWrite</span>(LED_PIN, LOW);
+        
+      } <span class="keyword">else</span> <span class="keyword">if</span> (inputBuffer == <span class="string">"DOWN"</span>) {
+        <span class="keyword">digitalWrite</span>(LED_PIN, HIGH);
+        Keyboard.<span class="keyword">press</span>(KEY_PAGE_DOWN);
+        <span class="keyword">delay</span>(50);
+        Keyboard.<span class="keyword">releaseAll</span>();
+        <span class="keyword">digitalWrite</span>(LED_PIN, LOW);
+      }
+      
+      inputBuffer = "";
+    } <span class="keyword">else</span> {
+      inputBuffer += c;
+    }
+  }
+}
+</code></pre>
+
+<!-- ============ 开发步骤 ============ -->
+<h2>📝 完整开发步骤</h2>
+
+<h3>Part A：发射端 (遥控器)</h3>
+
+<div class="step"><span class="step-num">1</span> <strong>搭建 Arduino 开发环境</strong><br>下载安装 <a target="_blank" href="https://www.arduino.cc/en/software">Arduino IDE 2.x</a>，连接 Arduino Nano，选择开发板和端口。</div>
+
+<div class="step"><span class="step-num">2</span> <strong>硬件接线</strong><br>按照上方接线图，连接 HC-12 模块（VCC→5V, GND→GND, TX→D2, RX→D3）和两个按键（D4, D5 + GND）。注意 HC-12 的 SET 引脚悬空（正常工作模式）。</div>
+
+<div class="step"><span class="step-num">3</span> <strong>配置 HC-12 模块</strong>（<span class="warn">关键步骤</span>）<br>将 HC-12 的 SET 引脚拉低(GND)，用串口工具发送 <code>AT</code> 指令确认通信。推荐设置：
+<pre><code>AT+FU3         // 模式 FU3 (极低功耗, 5000bps, 最远距离)
+AT+P8          // 发射功率 8 (最大, +20dBm)
+AT+C001        // 频道 001 (可改 001-127)
+AT+B9600       // 波特率 9600 (与代码一致)</code></pre>
+设置完后 SET 引脚悬空，重新上电。</div>
+
+<div class="step"><span class="step-num">4</span> <strong>烧录固件</strong><br>将上方发射端代码复制到 Arduino IDE → 编译 → 上传到 Nano。</div>
+
+<div class="step"><span class="step-num">5</span> <strong>供电方案</strong><br>18650 电池 (3.7V) → TP4056 充电保护板 → 升压模块 (可选, Nano 支持 5V 直接接 VIN) → Arduino Nano VIN。加一个电源开关方便关机省电。</div>
+
+<div class="step"><span class="step-num">6</span> <strong>测试</strong><br>通电后，用串口监视器(9600bps)连 Nano，按下按键应看到输出 "UP" 或 "DOWN"。</div>
+
+<h3>Part B：接收端 (接收器)</h3>
+
+<div class="step"><span class="step-num">1</span> <strong>硬件接线</strong><br>Pro Micro (5V) 接 HC-12（5V→VCC, GND→GND, D2→TX, D3→RX）。LED 接 D4+220Ω→GND。注意：<span class="warn">Pro Micro 的 USB 同时供电和通信</span>。</div>
+
+<div class="step"><span class="step-num">2</span> <strong>配置 HC-12</strong><br>与发射端的 HC-12 <span class="highlight">完全相同的参数</span> (FU3, P8, C001, B9600)。两边的频道、波特率必须一致！</div>
+
+<div class="step"><span class="step-num">3</span> <strong>烧录固件</strong><br>选择开发板 "Arduino Micro"，上传接收端代码。<span class="warn">⚠️ 烧录时如果 HC-12 占用 Serial1 引脚导致上传失败，先拔掉 HC-12 的 TX/RX，上传成功后再接上。</span></div>
+
+<div class="step"><span class="step-num">4</span> <strong>插上电脑验证</strong><br>LED 闪烁 3 次表示就绪。打开记事本或 Word，按下遥控器按键 → 应看到 Page Up / Page Down 效果。</div>
+
+<!-- ============ HC-12 配置详解 ============ -->
+<h2>⚙️ HC-12 模块配置详解</h2>
+
+<div class="card">
+  <h3>工作模式选择</h3>
+  <table>
+    <tr><th>模式</th><th>AT指令</th><th>空闲电流</th><th>空中速率</th><th>串口速率</th><th>距离</th></tr>
+    <tr><td>FU1</td><td>AT+FU1</td><td>3.6mA</td><td>250Kbps</td><td>自适应</td><td>~100m</td></tr>
+    <tr><td>FU2</td><td>AT+FU2</td><td>80μA</td><td>250Kbps</td><td>自适应</td><td>~100m</td></tr>
+    <tr class="highlight"><td><strong>FU3 ⭐</strong></td><td>AT+FU3</td><td>80μA</td><td>5Kbps</td><td>9600 固定</td><td><strong>~1000m</strong></td></tr>
+    <tr><td>FU4</td><td>AT+FU4</td><td>16mA</td><td>10Kbps</td><td>1200-115200</td><td>~600m</td></tr>
+  </table>
+  <p style="margin-top:12px"><span class="highlight">推荐 FU3 模式</span>：5Kbps 空中速率 + 9600 串口速率 → 最远 1000m，完全满足 100-300m 需求。</p>
+</div>
+
+<!-- ============ 关键技术点 ============ -->
+<h2>🔧 关键技术要点</h2>
+
+<h3>1. 为什么 Pro Micro 能模拟键盘？</h3>
+<p>Arduino Pro Micro 使用 <code>ATmega32U4</code> 芯片，内置 USB 控制器，支持 <span class="highlight">USB HID (Human Interface Device)</span> 协议。通过 <code>Keyboard.h</code> 库，可以像蓝牙键盘一样发送标准按键码。</p>
+
+<h3>2. HC-12 频率干扰如何避免？</h3>
+<ul>
+  <li>设置不同频道：<code>AT+C001</code> ~ <code>AT+C127</code></li>
+  <li>同一频道 + 不同地址可以实现多对多通信</li>
+  <li>如果附近有其他 433MHz 设备，换一个频道即可</li>
+</ul>
+
+<h3>3. 如何扩展长按功能？</h3>
+<p>在发射端代码中增加长按检测逻辑，收到 <code>INPUT_PULLUP=LOW</code> 时启动计时器，超时发送 <code>"UP_HOLD"</code>，接收端持续 <code>Keyboard.press(KEY_PAGE_UP)</code> 直到收到 <code>"UP_RELEASE"</code>。</p>
+
+<h3>4. 低功耗优化（延长遥控续航）</h3>
+<ul>
+  <li>Nano 空载 ~20mA → 用 Arduino Pro Mini (3.3V) 省一半</li>
+  <li>利用 HC-12 的 FU3 模式 (80μA 待机)</li>
+  <li>Arduino 进入 IDLE 睡眠模式，按键中断唤醒</li>
+  <li>2000mAh 18650 理论续航可达数周</li>
+</ul>
+
+<!-- ============ 测试验收 ============ -->
+<h2>✅ 测试验收清单</h2>
+<ol>
+  <li>发射端按键按下，串口监视器输出 "UP" / "DOWN"</li>
+  <li>接收端 LED 上电闪烁 3 次，串口监视器能收到无线数据</li>
+  <li>接收端插入 Windows PC，设备管理器出现 "USB Keyboard"</li>
+  <li>打开记事本 → 按遥控器 → 页面上下翻动</li>
+  <li>在 Word / PDF / 网页中测试翻页功能正常</li>
+  <li><span class="highlight">100-300m 空旷户外拉距测试</span></li>
+</ol>
+
+<!-- ============ 故障排查 ============ -->
+<h2>🛠️ 故障排查</h2>
+<table>
+  <tr><th>问题</th><th>原因</th><th>解决方法</th></tr>
+  <tr><td>接收不到信号</td><td>HC-12 频道/模式不匹配</td><td>两边都重新 AT 配置为完全相同的参数</td></tr>
+  <tr><td>距离很近但有丢包</td><td>天线未接好或电源噪声</td><td>焊接弹簧天线到 HC-12 的 ANT 焊盘, 电源加电容滤波</td></tr>
+  <tr><td>Pro Micro 无法上传</td><td>HC-12 占用串口</td><td>烧录时先拔掉 HC-12 的 D2/D3 线</td></tr>
+  <tr><td>电脑识别不到键盘</td><td>烧录后未复位</td><td>拔掉 USB 重插，或按一下 Pro Micro 上的 RST</td></tr>
+  <tr><td>按键无反应</td><td>INPUT_PULLUP 未正确接线</td><td>按键一端接 I/O 口, 另一端接 GND (不要接 VCC)</td></tr>
+  <tr><td>遥控距离不够</td><td>模式选错 / 功率太低</td><td>检查 AT+FU3 和 AT+P8, 确保两边 HC-12 天线焊接好</td></tr>
+</table>
+
+<hr>
+
+<div class="card" style="text-align:center">
+  <p>📐 方案版本: v1.0 | 📅 2026-06-21</p>
+  <p style="color:var(--accent);">433MHz 无线翻页遥控器 — 适用于演讲/授课/阅读 等场景的远距离翻页方案</p>
+</div>
+
+</div>
+</body>
+</html>
